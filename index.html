@@ -1,0 +1,37 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="copyright" content="(C) Leo Tomura 2018">
+	<style type="text/css">
+		.ALL{
+			width: 60%;
+			margin: auto;
+	}
+	</style>
+	<title>Denta-kun no tsukai kata(How to use Denta-kun)</title>
+</head>
+<body class="ALL">
+<h1>What Denta-kun does inside</h1>
+<h2>Introduction</h2>
+<p>
+Denta-kun is program written in C. denta-kun.h is header file included by 
+main.c and poly-funcs.c. main.c mostly does parsing of given input.
+poly-fucns.c includes codes for functions which start with 'poly'.
+</p>
+<p>
+When you see the definitions of functions, you may see a keywords 'mut' or 'unmut'.
+Those are key words that are used to notice you (and me) that whether the variable is
+going to be modified or not. If a declaration has keyword 'unmut', then a variable declared
+will not be modified at all. That is to say, objects that are pointed by objects declared 'unmut'
+does not be modified. It is your responsibility to not to moddify 'unmut' objects and objects
+pointed by 'unmut' objects. As you guessed, 'mut' variables are mostlikely going to be modified.
+mut and unmut is defined in denta-kun.h as "nothing". In future release, 'unmut' may be defined 
+as a keyword 'const', but I don't want to do this right now because doing it may cause compilation error. 
+</p>
+<h2>Definition in denta-kun.h</h2>
+<div style="text-align: right;">
+Copyright (C) 2019 Leo Tomura
+</div>
+</body>
+</html>

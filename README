@@ -1,0 +1,11 @@
+Denta-kun is an application that calculates Grobner bases from given generators.
+It takes tex-like input, and outputs tex-like text expressing a grobner base of it.
+
+To compile it, just execute make without any options. It is still in development. Therefore,
+it may not even compile.
+
+This program is written for the class 'Seminar 1' of Department of Computer Science, Chiba Institude of Technology.
+
+To contact the one who wrote this program, you can send e-mail to s1731108gt@s.chibakoudai.jp or 
+send message to a Twitter account @Charcoal_gone. It is possible that the e-mail adress I mentioned
+be deleted when you are reading this. Therefore, sending message to my Twitter account is recommended.
