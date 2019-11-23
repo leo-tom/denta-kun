@@ -44,32 +44,62 @@ typedef uint64_t Natural;
 typedef Numeric K;
 typedef Natural N;
 
+typedef enum _MonomialOrder{
+	LEX,
+	RLEX,
+	PLEX
+}MonomialOrder;
+
 typedef struct{
 	size_t size;
 	K coefficient;
 	N *degrees;
 }Item;
+
+#define MONOMIAL_ORDER_IN_BIN__LEX (0)
+#define MONOMIAL_ORDER_IN_BIN__RLEX (1)
+#define MONOMIAL_ORDER_IN_BIN__PLEX (2)
+
+#define polySize(p) (p.size & 0xfffffffffffffff)
+#define polyType(p) ((p.size >> 60) == MONOMIAL_ORDER_IN_BIN__RLEX ? RLEX : \
+					 ((p.size >> 60) == MONOMIAL_ORDER_IN_BIN__PLEX ? PLEX : LEX))
+#define setPolySize(p,newSize) do{ p.size &= ((int64_t)0xf) << 60;p.size |= (0xfffffffffffffff & (newSize));}while(0)
+#define setPolyType(p,t) do{p.size &= 0xfffffffffffffff; \
+							if( t == RLEX ){ \
+							 p.size |= (int64_t)MONOMIAL_ORDER_IN_BIN__RLEX << 60 ;\
+							}else if(t == PLEX){\
+							 p.size |= (int64_t)MONOMIAL_ORDER_IN_BIN__PLEX << 60;\
+							}else{\
+							 p.size |= (int64_t)MONOMIAL_ORDER_IN_BIN__LEX << 60;}}while(0)
+
 typedef struct{
-	size_t size; /*Assume size_t is 64 bit long. If not, this is not gonna work.*/
+	/*Assume size_t is 64 bit long. If not, this is not gonna work.*/
+	/*lower 60 bits are used to store size of an array *items*/
+	/*upper 4 bits are used to store monomial order that is used in this Poly.*/
+	size_t size; 
 	Item *items;
 }Poly;
 
-enum MonomialOrder{
-	LEX,
-	RLEX,
-	PLEX
+static const Poly nullPoly = {
+	.size = -1,
+	.items = NULL
 };
 
 extern const Poly nullPoly;
 
-Poly polyAdd(unmut Poly v1,Poly v2);
-Poly polySum(unmut Poly v1,Poly v2);
-Poly polyMul(unmut Poly v1,Poly v2);
+/*following functions takes Poly expected to be already sorted by same monomial order*/
+Poly polyAdd(unmut Poly v1,unmut Poly v2);
+Poly polySub(unmut Poly v1,unmut Poly v2);
+Poly polyMul(unmut Poly v1,unmut Poly v2);
+/*This function returns array of Poly whose length is (size + 1).*/
+/*divisor must be array of Poly whose length is 'size'*/
+Poly * polyDiv(unmut Poly dividend,unmut Poly *divisor,unmut size_t size);
 
-Poly polyErr(const char *str);
-Poly polySort(mut Poly poly,MonomialOrder order);
-Poly appendItem2Poly(unmut Poly poly,unmut Item item);
-int isNullPoly(unmut Poly v);
+Item _polyIn(unmut Poly poly);
+Poly polyIn(unmut Poly poly);
+Poly polySort(unmut Poly poly,MonomialOrder order);
+void polyPrint(unmut Poly poly,FILE *fp);
+Poly appendItem2Poly(mut Poly poly,mut Item item);
 int isNumericPoly(unmut Poly poly);
 double poly2Double(unmut Poly poly);
 Poly polyDup(unmut Poly poly);

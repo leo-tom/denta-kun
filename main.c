@@ -105,6 +105,7 @@ Node * __parser(FILE *stream){
 				append(head,butt,variable,_buff);
 			}
 			case '{':
+			case '(':
 			{
 				Node *new = malloc(sizeof(Node));
 				new->type = Block;
@@ -120,6 +121,7 @@ Node * __parser(FILE *stream){
 			}
 				break;
 			case '}':
+			case ')':
 				return head;
 			default :
 				if(isdigit(c) || c == '-'){
@@ -153,50 +155,64 @@ Node * __parser(FILE *stream){
 }
 
 Poly _parser(Node *n){
+	if(n == NULL){
+		return nullPoly;
+	}
 	Node *now = n;
 	Poly retval = {
-		.size = 1;
-		.items = NULL;
+		.size = 0,
+		.items = malloc(sizeof(Item))
 	};
-	
-	size_t heapSize = 16;
+	retval.items[0].size = 0;
+	retval.items[0].coefficient = 1;
+	retval.items[0].degrees = NULL;
+	setPolySize(retval,1);
+	setPolyType(retval,LEX);
 	
 	Item item = {
-		.size = 0;
-		.coefficient = 1;
-		.degrees = calloc(sizeof(N),heapSize);
+		.size = 0,
+		.coefficient = 1,
+		.degrees = NULL
 	};
+	
+	int didSomething = 0;
 	
 	while(now){
 		switch(now->type){
 			case Command:{
+				didSomething = 1;
 				if(!strcmp(now->str,"+") || !strcmp(now->str,"-")){
-					Poly tmp = appendItem2Poly(retval,item);
-					polyFree(retval);
-					retval = tmp;
-					free(item.indexes);item.indexes = calloc(sizeof(N),heapSize);
-					free(item.degrees);item.indexes = calloc(sizeof(N),heapSize);
-					heapSize = 16;
+					item.degrees = realloc(item.degrees,item.size * sizeof(N));
+					retval = appendItem2Poly(retval,item);
+					item.degrees = NULL;
 					item.size = 0;
 					if(!strcmp(now->str,"-")){
-						item.coefficient *= -1;
+						item.coefficient = -1;
 					}else{
 						item.coefficient = 1;
 					}
+					didSomething = 0;
 					//ok
 				}else if(!strcmp(now->str,"times") || !strcmp(now->str,"cdot")){
-					now = now->next
+					now = now->next;
 					if(now->type == Number){
 						item.coefficient *= atof(now->str);
 					}else if(now->type == Block){
+						
 						Poly tmp = _parser(*((Node **)&now->str));
-						item.coefficient *= poly2Double(tmp);
+						Poly temp = {
+							.size = 1,
+							.items = malloc(sizeof(Item))
+						};
+						temp.items[0] = item;
+						retval = polyMul(temp,tmp);
 						polyFree(tmp);
+						polyFree(temp);
 					}else{
-						DIE;
+						//ignore
 					}
 				}else if(!strcmp(now->str,"/")){
-					now = now->next
+					now = now->next;
 					if(now->type == Number){
 						item.coefficient /= atof(now->str);
 					}else if(now->type == Block){
@@ -209,41 +225,43 @@ Poly _parser(Node *n){
 				}
 			}break;
 			case Number:{
+				didSomething = 1;
 				item.coefficient *= atof(now->str); 
 			}break;
 			case Block:{
+				didSomething = 1;
 				Poly tmp = _parser(*((Node **)&now->str));
 				item.coefficient *= poly2Double(tmp);
 				polyFree(tmp);
 			}break;
 			case Variable:{
-				/*Ok. I think...*/
+				didSomething = 1;
 				if(!strcmp(now->str,"x")){
 					Node *prev = now;
 					now = now->next;
 					int counter = 0;
-					int index = -1;
-					N degrees = -1;
+					int index = 0;
+					N degrees = 1;
 					for(counter = 0;counter < 2;counter++){
 						if(now == NULL){
 							break;
-						}else if(!strcmp(now->str,"_") || !strcmp(now->str,"^"){
+						}else if(!strcmp(now->str,"_") || !strcmp(now->str,"^")){
 							now = now->next;
 							N n;
 							switch(now->type){
 								case Block:{
 									Poly tmp = _parser(*((Node **)&now->str));
 									n = (N)(poly2Double(tmp) + 0.5);
+									polyFree(tmp);
 								}break;
 								case Number:{
-									n = atol(now->next->str);
+									n = atol(now->str);
 								}break;
 								default : {
 									fprintf(stderr,"After \'%s\', a number or block must follow",now->str);
 									DIE;
 								}break;
 							}
-							
 							if(!strcmp(now->str,"_")){
 								index = n;
 							}else{
@@ -256,47 +274,34 @@ Poly _parser(Node *n){
 						prev = now;
 						now = now->next;
 					}
-					if(index >= size && degrees > 0){
+					if(index >= item.size){
 						N *newDegrees = calloc(sizeof(N),index + 1);
-						memcpy(newDegrees,item.degrees,size);
+						memcpy(newDegrees,item.degrees,item.size);
 						free(item.degrees);
 						item.degrees = newDegrees;
-						item.size = index + 1;
 					}
-					if(degrees > 0){
+					if(degrees >= 0){
 						item.degrees[index] += degrees;
+						if(index >= item.size){
+							item.size = index + 1;
+						}
 					}
 				}else{
 					fprintf(stderr,"Currently dentakun cannot accept variable name besides \'x\'\n");
 					DIE;
 				}
 			}
+		}
+		if(now){
 			now = now->next;
 		}
 	}
 	
-	if(item.size){
-		Poly tmp = appendItem2Poly(retval,item);
-		polyFree(retval);
-		retval = tmp;
-		free(item.indexes);
-		free(item.degrees);
+	if(didSomething){
+		retval = appendItem2Poly(retval,item);
 	}
 	return retval;
 }
-Poly parser(FILE *stream){
-	int c;
-	while((c = fgetc(stream))!=EOF){
-		if(c == '%'){
-			while((c = fgetc(stream))!= EOF && c != '\n')
-				;
-		}else{
-			return _parse(__parse(stream));
-		}
-	}
-	return nullPoly;
-}
-
 void _print_parsed_tex(Node *n,FILE *fp){
 	if(n == NULL){
 		return;
@@ -334,13 +339,35 @@ void _print_parsed_tex(Node *n,FILE *fp){
 		}
 		now = now->next;
 	}
-}	
+}
+Poly parser(FILE *stream){
+	int c;
+	while((c = fgetc(stream))!=EOF){
+		if(c == '%'){
+			while((c = fgetc(stream))!= EOF && c != '\n')
+				;
+		}else{
+			ungetc(c,stream);
+			Node *nodes = __parser(stream);
+			fprintf(stderr,"Input : ");
+			_print_parsed_tex(nodes,stderr);
+			fprintf(stderr,"\n");
+			return _parser(nodes);
+		}
+	}
+	return nullPoly;
+}
 
 int main(int argc,char *argv[]){
 	FILE *outfile = stdout;
-	Node *n = _parser(stdin);
-	_print_parsed_tex(n,outfile);
-	fprintf(outfile,"\n");
+	FILE *infile = stdin;
+	Poly poly = parser(infile);
+	while(poly.items){
+		polySort(poly,LEX);
+		polyPrint(poly,outfile);
+		fprintf(outfile,"\n");
+		poly = parser(infile);
+	}
 	return 0;
 }
 
