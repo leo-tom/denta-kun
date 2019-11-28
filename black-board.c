@@ -27,16 +27,3 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "denta-kun.h"
 
-int main(int argc,char *argv[]){
-	FILE *outfile = stdout;
-	FILE *infile = stdin;
-	Poly poly = parser(infile);
-	while(poly.items){
-		polySort(poly,LEX);
-		polyPrint(poly,outfile);
-		fprintf(outfile,"\n");
-		poly = parser(infile);
-	}
-	return 0;
-}
-

@@ -25,28 +25,11 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "denta-kun.h"
-/*
-size_t polySize(unmut Poly poly){return poly.size & 0xfffffffffffffff;}
-MonomialOrder polyType(unmut Poly p){
-	return (p.size >> 60) == MONOMIAL_ORDER_IN_BIN__RLEX ? RLEX : ((p.size >> 60)== MONOMIAL_ORDER_IN_BIN__PLEX ? PLEX : LEX);
-}
-void setPolySize(unmut Poly p,size_t newSize){
-	p.size &= ((int64_t)0xf) << 60;
-	p.size |= (0xfffffffffffffff & newSize);
-}
-void setPolyType(unmut Poly p,MonomialOrder t){
-	p.size &= 0xfffffffffffffff;
-	if( t == RLEX ){
-		p.size |= (int64_t)MONOMIAL_ORDER_IN_BIN__RLEX << 60 ;
-	}else if(t == PLEX){
-		p.size |= (int64_t)MONOMIAL_ORDER_IN_BIN__PLEX << 60;
-	}else{
-		p.size |= (int64_t)MONOMIAL_ORDER_IN_BIN__LEX << 60;
-	}
-}
-*/
 
-
+const Poly nullPoly = {
+	.size = -1,
+	.items = NULL
+};
 
 extern int _isSameMonomial(unmut Item v1,unmut Item v2);
 extern int _polycmp_LEX(const Item *v1,const Item *v2);
@@ -67,18 +50,7 @@ Poly polyDup(unmut Poly poly){
 }
 
 double poly2Double(unmut Poly poly){
-	int i;
-	double val = 0;
-	Poly dup = polyDup(poly);
-	for(i = 0;i < polySize(dup);i++){
-		if(dup.items[i].size > 0){
-			fprintf(stderr,"Trying to convert Poly to double but Poly has variable\n");
-			DIE;
-		}
-		val += poly.items[i].coefficient;
-	}
-	polyFree(dup);
-	return val;
+	return poly.items[0].coefficient;
 }
 
 void polyPrint(unmut Poly poly,FILE *fp){
@@ -87,10 +59,20 @@ void polyPrint(unmut Poly poly,FILE *fp){
 		const Item item = *(poly.items++);
 		if(item.coefficient == 0){
 			continue;
+		}else if(item.coefficient == 1 || item.coefficient == -1){
+			if(first){
+				first = 0;
+			}else if(item.coefficient == 1){
+				fprintf(fp,"+ ");
+			}else if(item.coefficient == -1){
+				fprintf(fp,"- ");
+			}else{
+				DIE;
+			}
 		}else{
 			if(first){
 				first = 0;
-				fprintf(stderr,"%.4f ",item.coefficient);
+				fprintf(fp,"%.4f ",item.coefficient);
 			}else if(item.coefficient < 0){
 				fprintf(fp,"- %.4f ",fabs(item.coefficient));
 			}else{
@@ -100,7 +82,7 @@ void polyPrint(unmut Poly poly,FILE *fp){
 		int i;
 		for(i = 0; i < item.size;i++){
 			if(item.degrees[i]){
-				fprintf(stderr,"x_{%d}^{%ld} ",i,item.degrees[i]);
+				fprintf(fp,"x_{%d}^{%ld} ",i,item.degrees[i]);
 			}
 		}
 	}
@@ -325,10 +307,8 @@ Item _copyItem(unmut Item item){
 }
 
 Poly appendItem2Poly(mut Poly poly,mut Item item){
-	fprintf(stderr,"Poly size :%ld\n",polySize(poly));
 	size_t newSize = polySize(poly) + 1 ; // setPolySize is macro. To make it work as we want, this line is necessary
 	setPolySize(poly, newSize );
-	fprintf(stderr,"Poly size changed : %ld\n",polySize(poly));
 	poly.items = realloc(poly.items,sizeof(Item)*polySize(poly));
 	poly.items[polySize(poly) - 1] = item;
 	return poly;

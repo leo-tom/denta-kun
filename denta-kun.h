@@ -76,16 +76,27 @@ typedef struct{
 	/*Assume size_t is 64 bit long. If not, this is not gonna work.*/
 	/*lower 60 bits are used to store size of an array *items*/
 	/*upper 4 bits are used to store monomial order that is used in this Poly.*/
-	size_t size; 
+	size_t size;
 	Item *items;
 }Poly;
 
-static const Poly nullPoly = {
-	.size = -1,
-	.items = NULL
-};
+typedef struct{
+	union {
+		char rawName[16];
+		char *ptr;	
+	}name;
+	Poly poly;
+}Definition;
+
+typedef struct{
+	Definition *array;
+	size_t size;
+	size_t capacity;
+}BlackBoard;
 
 extern const Poly nullPoly;
+
+Poly parser(FILE *stream);
 
 /*following functions takes Poly expected to be already sorted by same monomial order*/
 Poly polyAdd(unmut Poly v1,unmut Poly v2);

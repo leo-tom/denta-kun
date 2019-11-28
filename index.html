@@ -26,10 +26,207 @@ going to be modified or not. If a declaration has keyword 'unmut', then a variab
 will not be modified at all. That is to say, objects that are pointed by objects declared 'unmut'
 does not be modified. It is your responsibility to not to moddify 'unmut' objects and objects
 pointed by 'unmut' objects. As you guessed, 'mut' variables are mostlikely going to be modified.
-mut and unmut is defined in denta-kun.h as "nothing". In future release, 'unmut' may be defined 
-as a keyword 'const', but I don't want to do this right now because doing it may cause compilation error. 
+mut and unmut is defined in denta-kun.h as "nothing".
 </p>
 <h2>Definition in denta-kun.h</h2>
+In this section, I use the word "typedefed".
+When I say A is typedefed B, that is equivalent to :
+B is redefined to A using 'typedef' keyword.
+Is anyone using this expression...?
+<h3>Variables</h3>
+<p>
+Following table shows lists of Variables that are defined in denta-kun.h.
+Additionaly, structure called 'Node' is defined in main.c.
+Node is used to parse input and generate Poly and such.
+<table border=1>
+<caption>Variables</caption>
+<tr><th>Name</th><th>Members</th><th>Notes</th></tr>
+<tr>
+	<td>K</td>
+	<td>This is just "typedefed" double(64 bits floating point number).</td>
+	<td>
+		K is used to store coefficients of an Item.
+		For now, K is simply double. However in the future release, it may be changed to other element of 
+		a Field or Ring.
+	</td>
+</tr>
+<tr>
+	<td>N</td>
+	<td>This is just "typedefed" uint64_t.</td>
+	<td>
+		N is used to store degrees of a variable in Item.
+	</td>
+</tr>
+<tr>
+	<td>MonomialOrder</td>
+	<td>This is just "typedefed" enum whose members are LEX, RLEX, and PLEX.</td>
+	<td>
+		MonomialOrder is used to specify monomial order that is used to sort items.
+		Although it can be used withought keyword 'enum' in source code, it is enum. 
+	</td>
+</tr>
+<tr>
+	<td>Item</td>
+	<td>size_t size;K coefficient;N *degrees;</td>
+	<td>
+		This variable is used to express an item. Note that this is typedefed structure.
+		'coefficient' is used to store coefficient of itself.
+		'size' stores size of the 'degrees'. As its name suggests, degrees stores
+		degrees of variables. A subscript of an variable is corresponded to an index in 'degrees'.
+		Namely, a monomial x_0^4 x_1^7 x_3^2 would be expressed with the array : {4,7,0,2}.
+	</td>
+</tr>
+<tr>
+	<td>Poly</td>
+	<td>size_t size;Item *items;</td>
+	<td>
+	This variable is used to express a polynomial. Note that this is typedefed structure.
+	'*items' stores an array of Item objects.
+	'size' stores size of an array items and monomial order which is used to sort *items.
+	Lower 60 bits of 'size' are used to store size of an array '*items'.
+	Upper 4 bits of 'size' are used to store monomial order that is used to sort *items.
+	Note that you should never access to 'size' directly. Use macros shown in following table.
+	</td>
+</tr>
+</table>
+
+<h3>Macros</h3>
+<p>
+Following table shows macros that are defined in denta-kun.h.
+All C functions takes copy of variables as parameters.
+However, as they are being macro, they take parameters "as it is".
+That is to say, they are able to change variable which you gave to following macros.
+<table border=1>
+<caption>Macros</caption>
+<tr><th>Name</th><th>Return value</th><th>Parameters</th><th>Notes</th></tr>
+<tr>
+	<td>polySize</td>
+	<td>size_t</td>
+	<td>Poly p</td>
+	<td>
+		This macro returns size of 'p'.
+		This macro does not mutate 'p'.
+	</td>
+</tr>
+<tr>	
+	<td>polyType</td>
+	<td>MonomialOrder</td>
+	<td>Poly p</td>
+	<td>
+		This macro returns monomial order of 'p'.
+		This macro does not mutate 'p'.
+	</td>
+</tr>
+<tr>
+	<td>setPolySize</td>
+	<td>void</td>
+	<td>Poly p,size_t s</td>
+	<td>
+		's' will be set as size of 'p'.
+		This macro mutate 'p' but it does not mutate 's'.
+	</td>
+</tr>
+<tr>
+	<td>setPolyType</td>
+	<td>void</td>
+	<td>Poly p,MonomialOrder t</td>
+	<td>
+		't' will be set as monomial order of 'p'.
+		This macro mutate 'p' but it does not mutate 't'.
+	</td>
+</tr>
+</table>
+</p>
+
+<h3>Functions</h3>
+<p>
+Following table shows functions that are defined in denta-kun.h
+Note that the keyword 'unmut' is equivalent to 'const' keyword of C.
+However, 'unmut' is actually defined as nothing in denta-kun.h.
+It is because, although 'unmut' is used to tell programmers that a
+function does not mutate variable, some functions mutate it and 
+mutate it back to as it was.
+I did this to make code shorter and faster. 
+Also, you should note that variable with 'mut' keyword are to be
+mutated in a function.
+</p>
+<p>
+None of following functions which takes structure as parameter take pointer of structure.
+That means, none of them are capable of mutating variable inside a structure.
+However, they are able to objects that are pointed by pointer inside a structure.
+'mut' and 'unmut' declare that whether such objects are going to be muted or not.
+</p>
+<p>
+<table border=1>
+<caption>Macros</caption>
+<tr><th>Definition</th><th>Notes</th></tr>
+<tr>
+	<td>Poly polyAdd(unmut Poly v1,unmut Poly v2)</td>
+	<td>
+		This fucntion sums up v1 and v2, and returns summed up newly generated Poly.
+		Note that this function requires monomial order of v1 and v2 to be same.
+	</td>
+</tr>
+
+<tr>
+	<td>Poly polySub(unmut Poly v1,unmut Poly v2)</td>
+	<td>
+		This fucntion calculates 'v1 - v2', and returns newly generated Poly.
+		Note that this function requires monomial order of v1 and v2 to be same.
+	</td>
+</tr>
+
+<tr>
+	<td>Poly polyMul(unmut Poly v1,unmut Poly v2)</td>
+	<td>
+		This fucntion multiply v1 and v2, and returns multiplied newly generated Poly.
+		Note that this function requires monomial order of v1 and v2 to be same.
+	</td>
+</tr>
+
+<tr>
+	<td>Poly * polyDiv(unmut Poly dividend,unmut Poly *divisor,unmut size_t size);</td>
+	<td>
+		This fucntion returns "standard notation" of dividend by *divisor.
+		It returns an array of newly generated Poly sized 'size + 1'.
+		n-th object in its return value is polynomial which is quotient of n-th polynomial in '*divisor'.
+		'size'-th object in its return value is remander of standard notation.
+		'*divisor' is an array of Poly that are used to divide dividend by.
+		'dividend' is Poly that are divided by polynomials given by '*divisor'.
+		'size' must be size of an array given through '*divisor'.
+	</td>
+</tr>
+
+<tr>
+	<td></td>
+	<td>
+		
+	</td>
+</tr>
+
+<tr>
+	<td></td>
+	<td>
+		
+	</td>
+</tr>
+
+<tr>
+	<td></td>
+	<td>
+		
+	</td>
+</tr>
+
+<tr>
+	<td></td>
+	<td>
+		
+	</td>
+</tr>
+</table>
+</p>
+
 <div style="text-align: right;">
 Copyright (C) 2019 Leo Tomura
 </div>
