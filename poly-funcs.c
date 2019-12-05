@@ -27,7 +27,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "denta-kun.h"
 
 const Poly nullPoly = {
-	.size = -1,
+	.size = 0,
 	.items = NULL
 };
 
@@ -36,14 +36,24 @@ extern int _polycmp_LEX(const Item *v1,const Item *v2);
 extern int _polycmp_RLEX(const Item *v1,const Item *v2);
 extern int _polycmp_PLEX(const Item *v1,const Item *v2);
 extern Item _copyItem(unmut Item item);
-
+void polyFree(mut Poly v){
+	int i;
+	for(i=0;i < polySize(v);i++){
+		free(v.items[i].degrees);
+	}
+	free(v.items);
+}
+int isNullPoly(unmut Poly poly){
+	return poly.size == nullPoly.size
+			&& poly.items == nullPoly.items;
+}
 Poly polyDup(unmut Poly poly){
 	Poly retval = {
 		.size = poly.size,
 		.items = malloc(sizeof(Item)*polySize(poly))
 	};
 	int i;
-	for(i = 0;i < retval.size;i++){
+	for(i = 0;i < polySize(poly);i++){
 		retval.items[i] = _copyItem(poly.items[i]);
 	}
 	return retval;
@@ -54,10 +64,21 @@ double poly2Double(unmut Poly poly){
 }
 
 void polyPrint(unmut Poly poly,FILE *fp){
+	if(isNullPoly(poly)){
+		fprintf(fp,"(null)");
+		return;
+	}
 	int first = 1;
-	while(poly.size-- > 0){
+	size_t size = polySize(poly);
+	while(size-- > 0){
 		const Item item = *(poly.items++);
 		if(item.coefficient == 0){
+			if(item.size == 0){
+				fprintf(fp,"0");
+			}else{
+				fprintf(fp,"0\\cdot"); //Actually, this should not happen.
+				DIE;
+			}
 			continue;
 		}else if(item.coefficient == 1 || item.coefficient == -1){
 			if(first){
@@ -88,18 +109,21 @@ void polyPrint(unmut Poly poly,FILE *fp){
 	}
 }
 
-Item _polyIn(unmut Poly poly){
+Item __polyIn(unmut Poly poly){
 	if(polySize(poly) <= 0){
 		fprintf(stderr,"This poly has no items\n");
 		DIE;
 	}
-	return _copyItem(poly.items[0]);
+	return poly.items[0];
+}
+Item _polyIn(unmut Poly poly){
+	return _copyItem(__polyIn(poly));
 }
 Poly polyIn(unmut Poly poly){
 	Item item = _polyIn(poly);
 	Poly retval = {
 		.size = 0,
-		.items = malloc(sizeof(Poly))
+		.items = sizeof(Poly) ? 0 : malloc(sizeof(Poly))
 	};
 	retval.items[0] = item;
 	setPolySize(retval,1);
@@ -112,6 +136,9 @@ Poly polyAdd(unmut Poly v1,unmut Poly v2){
 		fprintf(stderr,"Trying to add Poly sorted by different monomial order\n");
 		DIE;
 	}
+	if(isNullPoly(v1) || isNullPoly(v2)){
+		return nullPoly;
+	}
 	int (*cmp)(const Item *v1,const Item *v2) = NULL;
 	switch(polyType(v1)){
 		case LEX : {cmp = _polycmp_LEX;break;}
@@ -121,29 +148,39 @@ Poly polyAdd(unmut Poly v1,unmut Poly v2){
 	int i,j,index;
 	i = j = index = 0;
 	Poly retval = {
-		.size = 0,
 		.items = malloc(sizeof(Item) * (polySize(v1) + polySize(v2)))
 	};
 	setPolySize(retval,(polySize(v1) + polySize(v2)));
 	setPolyType(retval,polyType(v1));
-	while(i < polySize(v1) && j < polySize(v2)){
-		int cmpVal = cmp(&v1.items[i],&v2.items[j]);
+	while(i < polySize(v1) || j < polySize(v2)){
+		int cmpVal;
 		if(i >= polySize(v1)){
-			cmpVal = 1;
-		}else if(j >= polySize(v2)){
 			cmpVal = -1;
+		}else if(j >= polySize(v2)){
+			cmpVal = +1;
+		}else{
+			cmpVal = cmp(&v1.items[i],&v2.items[j]);
 		}
-		if(cmpVal < 0){
+		if(cmpVal != 0 && index > 0 && retval.items[index-1].coefficient == 0){
+			index--;
+			free(retval.items[index].degrees);
+		}
+		if(cmpVal > 0){
 			retval.items[index++] = _copyItem(v1.items[i++]);
-		}else if(cmpVal > 0){
+		}else if(cmpVal < 0){
 			retval.items[index++] = _copyItem(v2.items[j++]);
 		}else{
 			retval.items[index] = _copyItem(v1.items[i++]);
 			retval.items[index++].coefficient += v2.items[j++].coefficient;
 		}
 	}
+	if(index > 0 && retval.items[index-1].coefficient == 0){
+		index--;
+		free(retval.items[index].degrees);
+	}
 	if(index < polySize(retval)){
 		retval.items = realloc(retval.items,sizeof(Item)*index);
+		setPolySize(retval,index);
 	}
 	return retval;
 }
@@ -163,6 +200,9 @@ Poly polyMul(unmut Poly v1,unmut Poly v2){
 		fprintf(stderr,"Trying to multiply Poly sorted by different monomial order\n");
 		DIE;
 	}
+	if(isNullPoly(v1) || isNullPoly(v2)){
+		return nullPoly;
+	}
 	int i,j,k,index;
 	Poly retval = {
 		.size = 0,
@@ -178,15 +218,18 @@ Poly polyMul(unmut Poly v1,unmut Poly v2){
 				}
 				retval.items[index].coefficient *= v2.items[j].coefficient;
 			}else{
-				retval.items[index] = _copyItem(v2.items[i]);
-				for(k = 0;k < v1.items[j].size ;k++){
-					retval.items[index].degrees[k] += v1.items[j].degrees[k];
+				retval.items[index] = _copyItem(v2.items[j]);
+				for(k = 0;k < v1.items[i].size ;k++){
+					retval.items[index].degrees[k] += v1.items[i].degrees[k];
 				}
-				retval.items[index].coefficient *= v1.items[j].coefficient;
+				retval.items[index].coefficient *= v1.items[i].coefficient;
 			}
+			index++;
 		}
 	}
 	MonomialOrder order = polyType(v1);
+	setPolySize(retval,index);
+	setPolyType(retval,order);
 	Poly tmp = retval;
 	retval = polySort(retval,order);
 	polyFree(tmp);
@@ -214,7 +257,7 @@ Poly * polyDiv(unmut Poly dividend,unmut Poly *divisor,unmut size_t size){
 	Poly h = polyDup(dividend);
 	Item *in_g = malloc(sizeof(Item) * size);
 	for(i = 0;i < size;i++){
-		in_g[i] = _polyIn(divisor[i]);
+		in_g[i] = __polyIn(divisor[i]);
 	}
 	Poly *retval = malloc(sizeof(Poly)*(size + 1));
 	for(i = 0;i < size;i++){
@@ -264,9 +307,7 @@ Poly * polyDiv(unmut Poly dividend,unmut Poly *divisor,unmut size_t size){
 					setPolyType(tmp,order);
 					Poly temp = polyMul(tmp,divisor[i]);
 					free(tmp.items);
-					Poly tempo = polySub(h,temp);
-					polyFree(temp);
-					polyFree(h);
+					Poly tempo = polySub(h,temp);polyFree(temp);polyFree(h);
 					h = tempo;
 					if(retval[i].size == 1 && retval[i].items[0].size == 0 && retval[i].items[0].coefficient == 0){
 						/*NEW!!*/
@@ -283,26 +324,18 @@ Poly * polyDiv(unmut Poly dividend,unmut Poly *divisor,unmut size_t size){
 		if(!exists){
 			break;
 		}
-	}while(1);
+	};
 	retval[size] = h;
 	return retval;
-}
-
-void polyFree(mut Poly v){
-	int i;
-	for(i=0;i < polySize(v);i++){
-		free(v.items[i].degrees);
-	}
-	free(v.items);
 }
 
 Item _copyItem(unmut Item item){
 	Item retval = {
 		.size = item.size,
 		.coefficient = item.coefficient,
-		.degrees = malloc(sizeof(item.size))
+		.degrees = malloc(sizeof(item.size) * sizeof(N))
 	};
-	memcpy(retval.degrees,item.degrees,item.size);
+	memcpy(retval.degrees,item.degrees,item.size * sizeof(N));
 	return retval; 
 }
 
@@ -381,6 +414,15 @@ int _polycmp_PLEX(const Item *v1,const Item *v2){
 		return +1;
 	} 
 }
+int polyCMP_LEX(const Item *v1,const Item *v2){
+	return -1*_polycmp_LEX(v1,v2);
+}
+int polyCMP_RLEX(const Item *v1,const Item *v2){
+	return -1*_polycmp_RLEX(v1,v2);
+}
+int polyCMP_PLEX(const Item *v1,const Item *v2){
+	return -1*_polycmp_PLEX(v1,v2);
+}
 
 int _isSameMonomial(unmut Item v1,unmut Item v2){
 	if(v1.size != v2.size){
@@ -399,11 +441,11 @@ Poly polySort(unmut Poly poly,MonomialOrder order){
 	Poly toBeSorted = polyDup(poly);
 	switch(order){
 		case LEX : {qsort(toBeSorted.items,polySize(toBeSorted),sizeof(Item)
-					,(int (*)(const void *,const void *))_polycmp_LEX); setPolyType(toBeSorted,LEX); break;}
+					,(int (*)(const void *,const void *))polyCMP_LEX); setPolyType(toBeSorted,LEX); break;}
 		case RLEX : {qsort(toBeSorted.items,polySize(toBeSorted),sizeof(Item)
-					,(int (*)(const void *,const void *))_polycmp_RLEX); setPolyType(toBeSorted,RLEX); break;}
+					,(int (*)(const void *,const void *))polyCMP_RLEX); setPolyType(toBeSorted,RLEX); break;}
 		case PLEX : {qsort(toBeSorted.items,polySize(toBeSorted),sizeof(Item)
-					,(int (*)(const void *,const void *))_polycmp_PLEX); setPolyType(toBeSorted,PLEX); break;}
+					,(int (*)(const void *,const void *))polyCMP_PLEX); setPolyType(toBeSorted,PLEX); break;}
 	}
 	Poly retval = {
 		.size = toBeSorted.size, /*Copy entire toBeSorted.size. That is, both type of monomial order and size of *items*/
@@ -416,6 +458,10 @@ Poly polySort(unmut Poly poly,MonomialOrder order){
 		for(j = i + 1;j < polySize(toBeSorted) && _isSameMonomial(toBeSorted.items[i],toBeSorted.items[j]);j++){
 			retval.items[index].coefficient += toBeSorted.items[j].coefficient;
 			free(toBeSorted.items[j].degrees);
+		}
+		if(retval.items[index].coefficient == 0){
+			free(retval.items[index].degrees);
+			index--;
 		}
 		i = j - 1;
 		index++;

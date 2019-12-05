@@ -36,7 +36,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define mut
 #define unmut
 
-#define DIE do{fprintf(stderr,"%s [%d] : Error\n",__FILE__ , __LINE__);exit(1);}while(0)
+#define DIE do{fprintf(stderr,"%s [%d] : Can AIs die? What is difference between death and stop running on CPU?\n",__FILE__ , __LINE__);exit(1);}while(0)
+
+extern FILE *OUTFILE;
 
 typedef double Numeric;
 typedef uint64_t Natural;
@@ -80,11 +82,12 @@ typedef struct{
 	Item *items;
 }Poly;
 
+#define DEFINITION_BYTES_SIZE (16)
+
 typedef struct{
-	union {
-		char rawName[16];
-		char *ptr;	
-	}name;
+	/*If (bytes[0] & 0x80) == 0, bytes is string*/
+	/*If (bytes[0] & 0x80) == 0x80, bytes[1] ~ bytes[9] is pointer to the string.*/
+	unsigned char bytes[DEFINITION_BYTES_SIZE];
 	Poly poly;
 }Definition;
 
@@ -94,9 +97,32 @@ typedef struct{
 	size_t capacity;
 }BlackBoard;
 
-extern const Poly nullPoly;
+typedef struct{
+	char name[8];
+	char description[64];
+	Poly (*funcptr)(Poly *,size_t,BlackBoard);
+}Function;
 
-Poly parser(FILE *stream);
+extern const Function BUILT_IN_FUNCS[];
+extern const size_t BUILT_IN_FUNC_SIZE;
+
+Poly callBuiltInFunc(const char *name,Poly *array, size_t size,BlackBoard blackboard);
+
+extern const Poly nullPoly;
+extern const Definition nullDefinition;
+int isNullPoly(unmut Poly poly);
+int isNullDefinition(unmut Definition definition);
+
+BlackBoard mkBlackBoard();
+void freeBlackBoard(mut BlackBoard blackboard);
+const char * getNameFromDefinition(unmut const Definition *def);
+void printBlackBoard(BlackBoard blackboard,FILE *fp);
+Definition mkDefinition(const char *name,size_t nameSize,mut Poly poly);
+BlackBoard insert2BlackBoard(mut BlackBoard blackboard,mut Definition def);
+BlackBoard sortBlackBoard(mut BlackBoard blackboard);
+Poly findFromBlackBoard(unmut BlackBoard blackboard,const char *name,size_t nameSize);
+
+Definition parser(FILE *stream,BlackBoard blackboard);
 
 /*following functions takes Poly expected to be already sorted by same monomial order*/
 Poly polyAdd(unmut Poly v1,unmut Poly v2);
@@ -111,7 +137,6 @@ Poly polyIn(unmut Poly poly);
 Poly polySort(unmut Poly poly,MonomialOrder order);
 void polyPrint(unmut Poly poly,FILE *fp);
 Poly appendItem2Poly(mut Poly poly,mut Item item);
-int isNumericPoly(unmut Poly poly);
 double poly2Double(unmut Poly poly);
 Poly polyDup(unmut Poly poly);
 void polyFree(mut Poly v);

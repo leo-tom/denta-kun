@@ -27,16 +27,25 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "denta-kun.h"
 
+FILE *OUTFILE = NULL;
+
 int main(int argc,char *argv[]){
-	FILE *outfile = stdout;
+	OUTFILE = stdout;
 	FILE *infile = stdin;
-	Poly poly = parser(infile);
-	while(poly.items){
-		polySort(poly,LEX);
-		polyPrint(poly,outfile);
-		fprintf(outfile,"\n");
-		poly = parser(infile);
+	BlackBoard blackboard = mkBlackBoard();
+	Definition definition = parser(infile,blackboard);
+	unsigned int anonIndex = 0;
+	char buff[128];
+	while(!feof(infile)){// while definition != nullDefinition
+		if(strlen(getNameFromDefinition(&definition)) == 0){
+			sprintf(buff,"$%u",anonIndex++);
+			definition = mkDefinition(buff,strlen(buff),definition.poly);
+		}
+		blackboard = insert2BlackBoard(blackboard,definition);
+		definition = parser(infile,blackboard);
 	}
+	blackboard = sortBlackBoard(blackboard);
+	
 	return 0;
 }
 

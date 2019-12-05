@@ -27,6 +27,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "denta-kun.h"
 
+extern Item _copyItem(unmut Item item);
+
 int getNextChar(FILE *stream){
 	int c;
 	while((c = fgetc(stream))!=EOF){
@@ -57,7 +59,7 @@ typedef struct _Node{
 #define append(head,butt,nodeType,data) do{ \
 	Node *newNodeDesu = malloc(sizeof(Node)); \
 	newNodeDesu->type = nodeType; \
-	strcpy(newNodeDesu->str,data); \
+	memcpy(newNodeDesu->str,data,64); \
 	newNodeDesu->next = NULL; \
 	if(butt == NULL){ \
 		head = butt = newNodeDesu; \
@@ -80,23 +82,24 @@ Node * __parser(FILE *stream){
 	
 	while((c = getNextChar(stream))!= EOF){
 		switch(c){
+			case '%':{
+				while((c = fgetc(stream))!= '\n' ){
+					;
+				}
+				break;
+			}
 			case '=':
+			case '+':
+			case '-':
+			case '^':
+			case '_':
+			case ',':
 			{
 				char buff[2];
 				buff[0] = c; buff[1] = 0;
 				append(head,butt,command,buff);
 				break;
 			}
-			case '+':
-			case '-':
-			case '^':
-			case '_':
-			{
-				char buff[2];
-				buff[0] = c; buff[1] = 0;
-				append(head,butt,command,buff);
-			}
-			break;
 			case '\\':
 			{
 				if((c = getNextChar(stream)) == '\\'){
@@ -108,8 +111,10 @@ Node * __parser(FILE *stream){
 				while(isalpha(c = getNextChar(stream)) ){
 					*buff++ = c;
 				}
+				*buff = 0;
 				ungetc(c,stream);
-				append(head,butt,variable,_buff);
+				append(head,butt,command,_buff);
+				break;
 			}
 			case '{':
 			case '(':
@@ -125,14 +130,17 @@ Node * __parser(FILE *stream){
 					butt->next = new;
 					butt = new;
 				}
-			}
 				break;
+			}
 			case '}':
 			case ')':
-				return head;
+				{
+					return head;
+				}
 			default :
+			{
 				if(isdigit(c) || c == '-'){
-					char _buff[256] = {0};
+					char _buff[256];
 					char *buff = _buff;
 					*buff++ = c;
 					while(isdigit(c = getNextChar(stream)) || c == '.' ){
@@ -142,20 +150,34 @@ Node * __parser(FILE *stream){
 					*buff = 0;
 					append(head,butt,number,_buff);
 				}else if(isalpha(c)){
-					char _buff[256]  = {0};
-					char *buff = _buff;
-					*buff++ = c;
-					while(isalpha(c = getNextChar(stream)) ){
-						*buff++ = c;
+					if(c == 'x'){
+						int tmp = fgetc(stream);
+						ungetc(tmp,stream);
+						if(!isalpha(tmp)){
+							char buff[8];
+							buff[0] = c; buff[1] = 0;
+							append(head,butt,variable,buff);
+							break;
+						}
 					}
-					ungetc(c,stream);
-					*buff = 0;
-					append(head,butt,variable,_buff);
+					
+					{
+						char _buff[256];
+						char *buff = _buff;
+						*buff++ = c;
+						while(isalpha(c = fgetc(stream)) || c == '_' || isdigit(c) || c == '{' || c == '}'){
+							*buff++ = c;
+						}
+						ungetc(c,stream);
+						*buff = 0;
+						append(head,butt,variable,_buff);
+					}
 				}else{
-					fprintf(stderr,"I dont know how to parse %c[%x]\n",c,c);
+					fprintf(stderr,"I dont know how to parse \'%c\'[%x]\n",c,c);
 					DIE;
 				}
-			break;	
+				break;
+			}	
 		}
 	}
 	return head;
@@ -169,7 +191,7 @@ void _print_parsed_tex(Node *n,FILE *fp){
 	while(now){
 		switch(now->type){
 			case Number : {
-				fprintf(fp," %f ",atof(now->str));
+				fprintf(fp," %s ",now->str);
 			}break;
 			case Variable : {
 				fprintf(fp," %s ",now->str);
@@ -200,95 +222,144 @@ void _print_parsed_tex(Node *n,FILE *fp){
 	}
 }
 #endif
-Poly _parser(Node *n){
-	if(n == NULL){
+extern Poly _parser(Node *head,Node *tail,BlackBoard blackboard);
+
+Poly _callFunc(const char *funcName,Node *block,BlackBoard blackboard){
+	size_t size = 2;
+	size_t index = 0;
+	Poly *array = malloc(sizeof(Poly) * size);
+	
+	Node *head;
+	head = block;
+	while(head){
+		Node *tail = head->next;
+		while(tail != NULL && (tail->type != Command && strcmp(tail->str,","))){
+			tail = tail->next;
+		}
+		if(index >= size){
+			size += 5;
+			array = realloc(array,sizeof(Poly) * size);
+		}
+		Poly tmp = _parser(head,tail,blackboard);
+		array[index++] = tmp;
+		head = (tail != NULL) ? tail->next : NULL;
+	}
+	if(index < size){
+		size = index;
+		array = realloc(array,sizeof(Poly) * size);
+	}
+	Poly retval = callBuiltInFunc(funcName,array,size,blackboard);
+	for(index = 0;index < size;index++){
+		polyFree(array[index]);
+	}
+	return retval;
+}
+Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
+	Node *now = head;
+	
+	if(now == NULL){
 		return nullPoly;
 	}
-	Node *now = n;
-	Poly retval = {
-		.size = 0,
-		.items = NULL
-	};
-	setPolySize(retval,0);
-	setPolyType(retval,LEX);
 	
-	Item item = {
-		.size = 0,
-		.coefficient = 1,
-		.degrees = NULL
-	};
-	
-	int didSomething = 0;
-	
-	while(now){
+	while(now != tail && now != NULL){
 		switch(now->type){
 			case Command:{
-				didSomething = 1;
-				if(!strcmp(now->str,"+") || !strcmp(now->str,"-")){
-					item.degrees = realloc(item.degrees,item.size * sizeof(N));
-					retval = appendItem2Poly(retval,item);
-					item.degrees = NULL;
-					item.size = 0;
-					if(!strcmp(now->str,"-")){
-						item.coefficient = -1;
-					}else{
-						item.coefficient = 1;
-					}
-					didSomething = 0;
-					//ok
-				}else if(!strcmp(now->str,"times") || !strcmp(now->str,"cdot")){
-					now = now->next;
-					if(now->type == Number){
-						item.coefficient *= atof(now->str);
-					}else if(now->type == Block){
-						
-						Poly tmp = _parser(*((Node **)&now->str));
-						Poly temp = {
-							.size = 1,
-							.items = malloc(sizeof(Item))
-						};
-						temp.items[0] = item;
-						retval = polyMul(temp,tmp);
-						polyFree(tmp);
-						polyFree(temp);
-					}else{
-						//ignore
-					}
-				}else if(!strcmp(now->str,"/")){
-					now = now->next;
-					if(now->type == Number){
-						item.coefficient /= atof(now->str);
-					}else if(now->type == Block){
-						Poly tmp = _parser(*((Node **)&now->str));
-						item.coefficient /= poly2Double(tmp);
-						polyFree(tmp);
-					}else{
-						DIE;
-					}
+				if(!strcmp(now->str,"+")){
+					Poly pLeft = _parser(head,now,blackboard);
+					Poly pRight = _parser(now->next,NULL,blackboard);
+					Poly retval = polyAdd(pLeft,pRight);
+					polyFree(pLeft);
+					polyFree(pRight);
+					return retval;
+				}else if(!strcmp(now->str,"-")){
+					Poly pLeft = _parser(head,now,blackboard);
+					Poly pRight = _parser(now->next,NULL,blackboard);
+					Poly retval = polySub(pLeft,pRight);
+					polyFree(pLeft);
+					polyFree(pRight);
+					return retval;
 				}
 				break;
 			}
-			case Number:{
-				didSomething = 1;
-				item.coefficient *= atof(now->str);
+			default:{
+				break;
+			}
+		}
+		now = now->next;
+	}
+	
+	now = head;
+	while(now != tail && now){
+		switch(now->type){
+			case Command:{
+				if(!strcmp(now->str,"times") || !strcmp(now->str,"cdot")){
+					Poly pLeft = _parser(head,now,blackboard);
+					Poly pRight = _parser(now->next,NULL,blackboard);
+					Poly retval = polyMul(pLeft,pRight);
+					polyFree(pLeft);
+					polyFree(pRight);
+					return retval;
+				}
+				break;
+			}
+			default:{
+				break;
+			}
+		}
+		now = now->next;
+	}
+	
+	Poly retval = {
+		.items = malloc(sizeof(Item)*1)
+	};
+	retval.items[0].coefficient = 1;
+	retval.items[0].degrees = NULL;
+	retval.items[0].size = 0;
+	setPolySize(retval,1);
+	setPolyType(retval,LEX);
+	
+	now = head;
+	while(now != tail && now){
+		switch(now->type){
+			case Command:{
+				const char *str = now->str;
+				now = now->next;
+				if(now == NULL || now->type != Block){
+					fprintf(stderr,"\'{\' or \'(\' is expected after a call of function\n");
+					DIE;
+				}
+				blackboard = sortBlackBoard(blackboard);
+				Poly p = _callFunc(str,*((Node **)&now->str),blackboard);
+				Poly tmp = polyMul(retval,p);
+				polyFree(p);
+				polyFree(retval);
+				retval = tmp;
+				now = now->next;
 				break;
 			}
 			case Block:{
-				didSomething = 1;
-				Poly _tmp = _parser(*((Node **)&now->str));
-				Poly tmp = polySort(_tmp,LEX);
-				item.coefficient *= poly2Double(tmp);
-				polyFree(tmp);
-				polyFree(_tmp);
+				Poly p = _parser(*((Node **)&now->str),NULL,blackboard);
+				Poly tmp = polyMul(retval,p);
+				polyFree(p);
+				polyFree(retval);
+				retval = tmp;
+				now = now->next;
+				break;
+			}
+			case Number:{
+				K val = atof(now->str);
+				int i = 0;
+				for(i = 0;i < polySize(retval);i++){
+					retval.items[i].coefficient *= val;
+				}
+				now = now->next;
 				break;
 			}
 			case Variable:{
-				didSomething = 1;
 				if(!strcmp(now->str,"x")){
-					Node *prev = now;
 					now = now->next;
 					int counter = 0;
-					int index = 0;
+					N index = 0;
 					N degrees = 1;
 					for(counter = 0;counter < 2;counter++){
 						if(now == NULL){
@@ -304,14 +375,12 @@ Poly _parser(Node *n){
 							N n;
 							switch(now->type){
 								case Block:{
-									Poly _tmp = _parser(*((Node **)&now->str));
-									Poly tmp = polySort(_tmp,LEX);
+									Poly tmp = _parser(*((Node **)&now->str),NULL,blackboard);
 									n = (N)(poly2Double(tmp) + 0.5);
 									polyFree(tmp);
-									polyFree(_tmp);
 								}break;
 								case Number:{
-									n = atol(now->str);
+									n = (N) atol(now->str);
 								}break;
 								default : {
 									fprintf(stderr,"After \'%s\', a number or block must follow",now->str);
@@ -323,60 +392,118 @@ Poly _parser(Node *n){
 							}else{
 								degrees = n;
 							}
+							now = now->next;
 						}else{
-							now = prev;
 							break;
 						}
-						prev = now;
-						now = now->next;
 					}
-					if(index >= item.size){
-						N *newDegrees = calloc(sizeof(N),index + 1);
-						memcpy(newDegrees,item.degrees,item.size * sizeof(N));
-						free(item.degrees);
-						item.degrees = newDegrees;
-					}
-					//if(degrees != -1){
-						item.degrees[index] += degrees;
-						if(index >= item.size){
-							item.size = index + 1;
-						}
-					//}
+					Item item = {
+						.size = (index + 1),
+						.degrees = calloc(index + 1,sizeof(N)),
+						.coefficient = 1
+					};
+					item.degrees[index] = degrees;
+					
+					Poly mulDis = {
+						.items = malloc(sizeof(Item))
+					};
+					mulDis.items[0] = item;
+					setPolySize(mulDis,1);
+					setPolyType(mulDis,LEX);
+					
+					Poly tmp = polyMul(retval,mulDis);
+					polyFree(retval);
+					polyFree(mulDis);
+					retval = tmp;
 				}else{
-					fprintf(stderr,"Currently dentakun cannot accept variable name besides \'x\'\n");
-					DIE;
+					Poly mulDis = findFromBlackBoard(blackboard,now->str,strlen(now->str));
+					if(isNullPoly(mulDis) ) {fprintf(stderr,"Variable %s undefined.\n",now->str);DIE;}
+					if(polyType(mulDis) != LEX){
+						Poly temp = polySort(mulDis,LEX); polyFree(mulDis);
+						mulDis = temp;
+					}
+					Poly tmp = polyMul(retval,mulDis); polyFree(retval); polyFree(mulDis);
+					retval = tmp;
+					now = now->next;
 				}
 				break;
 			}
-			default : {DIE;}
+			default :{
+				fprintf(stderr,"%s\n",now->str);DIE;
+			}
 		}
-		if(now){
-			now = now->next;
-		}
-	}
-	
-	if(didSomething){
-		retval = appendItem2Poly(retval,item);
 	}
 	return retval;
 }
-Poly parser(FILE *stream){
+
+size_t _node2str(Node *head,Node *tail,char *buff,size_t index,size_t size){
+	while(head != tail && head){
+		switch(head->type){
+			case Command:{
+				if(!strcmp(head->str,"_")){
+					if(index + 2 >= size) {DIE;}
+					buff[index++] = '_';
+					buff[index] = 0;
+					break;
+				}
+				break;
+			}
+			case Block:{
+				index = _node2str(*((Node **)&head->str),NULL,buff,index,size);
+				break;
+			}
+			case Variable:{
+				strcpy(&buff[index],head->str);
+				index += strlen(head->str);
+				break;
+			}
+			case Number:{
+				strcpy(&buff[index],head->str);
+				index += strlen(head->str);
+				break;
+			}
+		}
+		head = head->next;
+	}
+	return index;
+}
+
+Definition takeDefinitionFromNode(Node *node,BlackBoard blackboard){
+	Node *now = node;
+	if(node->type == Variable && node->next->type == Command && !strcmp(node->next->str,"=")){
+		if(!strcmp(node->str,"x")){
+			fprintf(stderr,"You cant define variable named \"x\".\n");
+			DIE;
+		}
+		return mkDefinition(node->str,strlen(node->str),_parser(now->next->next,NULL,blackboard));
+	}else{
+		char buff[2];
+		buff[0] = 0;
+		return mkDefinition(buff,0,_parser(node,NULL,blackboard));
+	}
+}
+
+Definition parser(FILE *stream,BlackBoard blackboard){
 	int c;
 	while((c = fgetc(stream))!=EOF){
-		if(c == '%'){
-			while((c = fgetc(stream))!= EOF && c != '\n')
-				;
-		}else{
-			ungetc(c,stream);
-			Node *nodes = __parser(stream);
-			#if DEBUG == 1
+		ungetc(c,stream);
+		Node *nodes = __parser(stream);
+		if(nodes == NULL){
+			return nullDefinition;
+		}
+		#if DEBUG == 1
 			fprintf(stderr,"Input : ");
 			_print_parsed_tex(nodes,stderr);
 			fprintf(stderr,"\n");
-			#endif
-			return _parser(nodes);
-		}
+			
+			Definition def = takeDefinitionFromNode(nodes,blackboard);
+			fprintf(stderr,"Parsed as : ");
+			polyPrint(def.poly,stderr);
+			fprintf(stderr,"\n");
+			return def;
+		#endif
+		return takeDefinitionFromNode(nodes,blackboard);
 	}
-	return nullPoly;
+	return nullDefinition;
 }
 
