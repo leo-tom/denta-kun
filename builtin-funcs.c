@@ -31,7 +31,7 @@ int _cmpFunction(const Function *v1,const Function *v2){
 	return strcmp(v1->name,v2->name);
 }
 
-Poly callBuiltInFunc(const char *name,Poly *array, size_t size,BlackBoard blackboard){
+Poly callBuiltInFunc(const char *name,Poly arg,BlackBoard blackboard){
 	Function findThis = {
 		.name = {0} //for some reason, valgrind says "Conditional jump or move depends on uninitialised value"
 					//without initializing with zero.
@@ -42,63 +42,166 @@ Poly callBuiltInFunc(const char *name,Poly *array, size_t size,BlackBoard blackb
 	if(found == NULL){
 		fprintf(stderr, "\"%s\" is not defined.\n",name);DIE;
 	}
-	return found->funcptr(array,size,blackboard);
+	return found->funcptr(arg,blackboard);
 }
 
-Poly builtIn_SSN(Poly *array,size_t size,BlackBoard blackboard){
-	if(size <= 1){
+Poly builtIn_SSN(Poly arg,BlackBoard blackboard){
+	if(polyType(arg) != ARRAY || polySize(arg) <= 1){
 		fprintf(stderr,"SSN takes at least 2 arguments.\n");DIE;
 	}
-	Poly *result = polyDiv(array[0],&array[1],size - 1);
-	size_t i;
-	#if DEBUG
-		FILE *fp = stderr;
-		polyPrint(array[0],fp);
-		fprintf(fp, " = ");
-		array++;
-		size--;
-		for(i = 0;i < size;i++){
-			fprintf(fp," (");
-			polyPrint(result[i],fp);
-			fprintf(fp,")(");
-			polyPrint(array[i],fp);
-			fprintf(fp,") +");
-		}
-		size++;
-		fprintf(fp," ");
-		polyPrint(result[i],fp);
-		fprintf(fp,"\n");
-		array--;
-	#endif
-	polyFree(result[0]);
-	polyFree(result[size - 1]);
-	for(i = 1;i < size;i++){
-		polyFree(array[i]);
-		polyFree(result[i]);
-	}
-	return array[0];
+	Poly *array = unwrapPolyArray(arg);
+	Poly divisors = mkPolyArray(&array[1],polySize(arg) - 1 );
+	Poly result = polyDiv(array[0],divisors); polyFree(arg);
+	return result;
 }
 
-Poly builtIn_PBB(Poly *array,size_t size,BlackBoard blackboard){
+Poly builtIn_PBB(Poly arg,BlackBoard blackboard){
 	printBlackBoard(blackboard,OUTFILE);
-	size_t i;
-	for(i = 0;i < size;i++){
-		polyFree(*array++);
-	}
+	polyFree(arg);
 	return nullPoly;
 }
 
-Poly builtIn_PP(Poly *array,size_t size,BlackBoard blackboard){
-	size_t i;
-	for(i = 0;i < size;i++){
-		polyPrint(*array,OUTFILE);
-		polyFree(*array++);
-	}
+Poly builtIn_PP(Poly arg,BlackBoard blackboard){
+	polyPrint(arg,OUTFILE);
+	fprintf(OUTFILE,"\n");
+	polyFree(arg);
 	return nullPoly;
 }
+Poly builtIn_SP(Poly arg,BlackBoard blackboard){
+	if(polyType(arg) != ARRAY && polySize(arg) != 2){
+		fprintf(stderr,"S polynomial can be computed only with 2 polynomials\n");
+		DIE;
+	}
+	Poly *array = unwrapPolyArray(arg);
+	Poly retval = polyS(array[0],array[1]);
+	polyFree(arg);
+	return retval;
+}
 
-const size_t BUILT_IN_FUNC_SIZE = 3;
+int _isCoprime(Item v1,Item v2){
+	size_t s = v1.size > v2.size ? v2.size : v1.size;
+	size_t i;
+	for(i = 0;i < s;i++){
+		if(v1.degrees[i] && v2.degrees[i]){
+			return 0;
+		}
+	}
+	return 1;
+}
+
+/*Returns 0 if array is grobner basis*/
+/*Returns reminder of S(g_i,g_j) divided by array*/
+Poly _isThisGrobnerBasis(Poly array){
+	size_t s = polySize(array);
+	Poly *ptr = (Poly *) unwrapPolyArray(array);
+	Item *in = malloc(sizeof(Item)*s);
+	size_t i,j;
+	for(i = 0;i < s;i++){
+		in[i] = __polyIn(ptr[i]);
+	}
+	Poly reminder;
+	for(i = 0;i < s;i++){
+		for(j = i + 1;j < s;j++){
+			if(_isCoprime(in[i],in[j])){
+				break;
+			}
+			Poly s_i_j = polyS(ptr[i],ptr[j]);
+			reminder = polySim(s_i_j,array);polyFree(s_i_j);
+			if(polySize(reminder) == 1 && cmpK(reminder.items[0].coefficient, K_0)){
+				polyFree(reminder);
+			}else{
+				goto ret;
+			}
+			Poly s_j_i = polyS(ptr[j],ptr[i]);
+			reminder = polySim(s_j_i,array);polyFree(s_j_i);
+			if(polySize(reminder) == 1 && cmpK(reminder.items[0].coefficient, K_0)){
+				polyFree(reminder);
+			}else{
+				goto ret;
+			}
+		}
+	}
+	Item item = {
+		.size = 1,
+		.coefficient = K_0,
+		.degrees = NULL
+	};
+	reminder = item2Poly(item);
+	MonomialOrder order = polyType(ptr[0]);
+	setPolyType(reminder,order);
+	ret:
+	free(in);
+	return reminder;
+}
+Poly _grobnerBasis2ReducedGrobnerBasis(mut Poly grobner){
+	size_t i;
+	size_t size = polySize(grobner);
+	Poly *ptr = unwrapPolyArray(grobner);
+	ptr = realloc(ptr , size * 2 * sizeof(Poly));
+	
+	for(i = 0;i < size;i++){
+		Poly divisors = mkPolyArray(&ptr[i+1],size - 1);
+		Poly r = polySim(ptr[i],divisors);
+		ptr[i + size] = r;
+	}
+	Poly *newArray = malloc(sizeof(Poly)*size);
+	size_t index = 0;
+	for(i = 0;i < size;i++){
+		polyFree(ptr[i]);
+		Poly p = ptr[i + size];
+		if(p.size == 1 && !cmpK(p.items[0].coefficient , K_0)){
+			polyFree(p);
+			continue;
+		}else{
+			size_t j;
+			K gyaku = divK(K_1,p.items[0].coefficient);
+			for(j = 0;j < polySize(p);j++){
+				p.items[j].coefficient = mulK(gyaku,p.items[j].coefficient);
+			}
+			newArray[index++] = p;
+		}
+	}
+	free(ptr);
+	if(size != index){
+		size = index;
+		newArray = realloc(newArray,sizeof(Poly) * size);
+	}
+	return mkPolyArray(newArray,size);
+}
+Poly builtIn_BBA(Poly array,BlackBoard blackboard){
+	Poly r;
+	size_t capacity = polySize(array);
+	size_t i = polySize(array);
+	while((r=_isThisGrobnerBasis(array)).size >= 1 && !cmpK(r.items[0].coefficient,K_0)){
+		if(i >= capacity){
+			capacity *= 2;
+			array.items = realloc(array.items,capacity * sizeof(Poly));
+		}
+		((Poly *)array.items)[i] = r;
+		i++;
+	}
+	if(i < capacity){
+		array.items = realloc(array.items,i * sizeof(Poly));
+	}
+	setPolySize(array,i);
+	return _grobnerBasis2ReducedGrobnerBasis(array);
+}
+Poly builtIn_SIM(Poly arg,BlackBoard blackboard){
+	if(polyType(arg) != ARRAY && polySize(arg) != 2){
+		DIE;
+	}
+	Poly *array = unwrapPolyArray(arg);
+	Poly divisors = mkPolyArray(&array[1],polySize(arg) - 1 );
+	Poly result = polySim(array[0],divisors); polyFree(arg);
+	return result;
+}
+const size_t BUILT_IN_FUNC_SIZE = 6;
 const Function BUILT_IN_FUNCS[] = {
+	{
+		.name = "BBA",
+		.description = "Buchberger algorithm",
+		.funcptr = builtIn_BBA
+	},
 	{
 		.name = "PBB",
 		.description = "Print out blackboard.",
@@ -110,9 +213,20 @@ const Function BUILT_IN_FUNCS[] = {
 		.funcptr = builtIn_PP
 	},
 	{
+		.name = "SP",
+		.description = "Calculate S polynomial",
+		.funcptr = builtIn_SP
+	},
+	{
+		.name = "SIM",
+		.description = "Calculate simplified polynomial",
+		.funcptr = builtIn_SIM
+	},
+	{
 		.name = "SSN",
-		.description = "Print standard notation to stderr.",
+		.description = "Calculate standard notation.",
 		.funcptr = builtIn_SSN
 	}
+	
 };
 

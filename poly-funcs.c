@@ -36,12 +36,29 @@ extern int _polycmp_LEX(const Item *v1,const Item *v2);
 extern int _polycmp_RLEX(const Item *v1,const Item *v2);
 extern int _polycmp_PLEX(const Item *v1,const Item *v2);
 extern Item _copyItem(unmut Item item);
-void polyFree(mut Poly v){
+void _polyFree(mut Poly v){
 	int i;
 	for(i=0;i < polySize(v);i++){
 		free(v.items[i].degrees);
 	}
 	free(v.items);
+}
+void polyFree(mut Poly v){
+	size_t size = polySize(v);
+	size_t i;
+	if(polyType(v) == ARRAY){
+		Poly *ptr = (Poly *)v.items;
+		for(i = 0;i < size;i++){
+			polyFree(*ptr++);
+		}
+	}else{
+		for(i=0;i < size;i++){
+			free(v.items[i].degrees);
+		}
+	}
+	if(size > 0){
+		free(v.items);
+	}
 }
 int isNullPoly(unmut Poly poly){
 	return poly.size == nullPoly.size
@@ -49,30 +66,55 @@ int isNullPoly(unmut Poly poly){
 }
 Poly polyDup(unmut Poly poly){
 	Poly retval = {
-		.size = poly.size,
-		.items = malloc(sizeof(Item)*polySize(poly))
+		.size = poly.size
 	};
-	int i;
-	for(i = 0;i < polySize(poly);i++){
-		retval.items[i] = _copyItem(poly.items[i]);
+	if(polyType(poly) == ARRAY){
+		retval.items = malloc(sizeof(Poly)*polySize(poly));
+		Poly *from = (Poly *)poly.items;
+		Poly *to = (Poly *)retval.items;
+		int i;
+		for(i = 0;i < polySize(poly);i++){
+			to[i] = polyDup(from[i]);
+		}
+	}else{
+		retval.items = malloc(sizeof(Item)*polySize(poly));
+		int i;
+		for(i = 0;i < polySize(poly);i++){
+			retval.items[i] = _copyItem(poly.items[i]);
+		}
 	}
 	return retval;
 }
 
 double poly2Double(unmut Poly poly){
-	return poly.items[0].coefficient;
+	if(poly.size != 1 || poly.items[0].size > 0){
+		fprintf(stderr,"Trying to call poly2Double to : ");polyPrint(poly,stderr);fprintf(stderr,"\n");
+		DIE;
+	}
+	return K2double(poly.items[0].coefficient);
 }
 
 void polyPrint(unmut Poly poly,FILE *fp){
+	size_t size = polySize(poly);
 	if(isNullPoly(poly)){
 		fprintf(fp,"(null)");
 		return;
+	}else if(polyType(poly) == ARRAY){
+		Poly *head = (Poly *)poly.items;
+		fprintf(fp,"(");
+		while(size--){
+			polyPrint(*head++,fp);
+			if(size != 0){
+				fprintf(fp," , ");
+			}
+		}
+		fprintf(fp," )");
+		return;
 	}
 	int first = 1;
-	size_t size = polySize(poly);
 	while(size-- > 0){
 		const Item item = *(poly.items++);
-		if(item.coefficient == 0){
+		if(!cmpK(item.coefficient,KAHO_NO_TANIGEN)){
 			if(item.size == 0){
 				fprintf(fp,"0");
 			}else{
@@ -80,24 +122,28 @@ void polyPrint(unmut Poly poly,FILE *fp){
 				DIE;
 			}
 			continue;
-		}else if(item.coefficient == 1 || item.coefficient == -1){
-			if(first){
-				first = 0;
-			}else if(item.coefficient == 1){
+		}else if((!cmpK(item.coefficient,JOHO_NO_TANIGEN) ||!cmpK(item.coefficient,JOHO_NO_TANIGEN_NO_KAHO_NO_GYAKUGEN)
+					) && item.size > 0 ){
+			if(!first && !cmpK(item.coefficient,JOHO_NO_TANIGEN)){
 				fprintf(fp,"+ ");
-			}else if(item.coefficient == -1){
+			}else if(!cmpK(item.coefficient,JOHO_NO_TANIGEN_NO_KAHO_NO_GYAKUGEN)){
 				fprintf(fp,"- ");
+			}else if( first ){
+				;
 			}else{
 				DIE;
 			}
+			first = 0;
 		}else{
+			char buff[128] = {0};
 			if(first){
 				first = 0;
-				fprintf(fp,"%.4f ",item.coefficient);
-			}else if(item.coefficient < 0){
-				fprintf(fp,"- %.4f ",fabs(item.coefficient));
+				fprintf(fp,"%s ",K2str(item.coefficient,buff));
+			}else if(cmpK(item.coefficient,JOHO_NO_TANIGEN) < 0){
+				K tmp = mulK(K_N1,item.coefficient);
+				fprintf(fp," - %s ",K2str(tmp,buff));
 			}else{
-				fprintf(fp,"+ %.4f ",fabs(item.coefficient));
+				fprintf(fp," + %s ",K2str(item.coefficient,buff));
 			}
 		}
 		int i;
@@ -131,12 +177,23 @@ Poly polyIn(unmut Poly poly){
 	return retval;
 }
 
+Poly item2Poly(mut Item item){
+	Poly retval = {
+		.items = malloc(sizeof(Item)*2)
+	};
+	setPolySize(retval,1);
+	setPolyType(retval,LEX);
+	retval.items[0] = item;
+	return retval;
+}	
+
 Poly polyAdd(unmut Poly v1,unmut Poly v2){
 	if(polyType(v1) != polyType(v2)){
 		fprintf(stderr,"Trying to add Poly sorted by different monomial order\n");
 		DIE;
 	}
 	if(isNullPoly(v1) || isNullPoly(v2)){
+		//DIE;
 		return nullPoly;
 	}
 	int (*cmp)(const Item *v1,const Item *v2) = NULL;
@@ -144,6 +201,7 @@ Poly polyAdd(unmut Poly v1,unmut Poly v2){
 		case LEX : {cmp = _polycmp_LEX;break;}
 		case RLEX : {cmp = _polycmp_RLEX;break;}
 		case PLEX : {cmp = _polycmp_PLEX;break;}
+		case ARRAY : {DIE;}
 	}
 	int i,j,index;
 	i = j = index = 0;
@@ -152,6 +210,7 @@ Poly polyAdd(unmut Poly v1,unmut Poly v2){
 	};
 	setPolySize(retval,(polySize(v1) + polySize(v2)));
 	setPolyType(retval,polyType(v1));
+	int someThingDisappeared = 0;
 	while(i < polySize(v1) || j < polySize(v2)){
 		int cmpVal;
 		if(i >= polySize(v1)){
@@ -161,9 +220,10 @@ Poly polyAdd(unmut Poly v1,unmut Poly v2){
 		}else{
 			cmpVal = cmp(&v1.items[i],&v2.items[j]);
 		}
-		if(cmpVal != 0 && index > 0 && retval.items[index-1].coefficient == 0){
+		if(/*cmpVal != 0 && */index > 0 && ! cmpK(retval.items[index-1].coefficient,K_0)){
 			index--;
 			free(retval.items[index].degrees);
+			someThingDisappeared = 1;
 		}
 		if(cmpVal > 0){
 			retval.items[index++] = _copyItem(v1.items[i++]);
@@ -171,14 +231,24 @@ Poly polyAdd(unmut Poly v1,unmut Poly v2){
 			retval.items[index++] = _copyItem(v2.items[j++]);
 		}else{
 			retval.items[index] = _copyItem(v1.items[i++]);
-			retval.items[index++].coefficient += v2.items[j++].coefficient;
+			retval.items[index].coefficient = addK(retval.items[index].coefficient
+														, v2.items[j].coefficient);
+			index++; j++;
 		}
 	}
-	if(index > 0 && retval.items[index-1].coefficient == 0){
+	if(index > 0 && !cmpK( retval.items[index-1].coefficient , K_0)){
 		index--;
 		free(retval.items[index].degrees);
+		someThingDisappeared = 1;
 	}
-	if(index < polySize(retval)){
+	if(index == 0 && someThingDisappeared){
+		index = 1;
+		setPolySize(retval,index);
+		retval.items = realloc(retval.items,sizeof(Item)*2);
+		retval.items[0].degrees = NULL;
+		retval.items[0].size = 0;
+		retval.items[0].coefficient = K_0;
+	}else if(index < polySize(retval)){
 		retval.items = realloc(retval.items,sizeof(Item)*index);
 		setPolySize(retval,index);
 	}
@@ -187,11 +257,11 @@ Poly polyAdd(unmut Poly v1,unmut Poly v2){
 Poly polySub(unmut Poly v1,unmut Poly v2){
 	int i;
 	for(i = 0;i < polySize(v2);i++){
-		v2.items[i].coefficient *= -1;
+		v2.items[i].coefficient = mulK(v2.items[i].coefficient,JOHO_NO_TANIGEN_NO_KAHO_NO_GYAKUGEN);
 	}
 	Poly retval = polyAdd(v1,v2);
 	for(i = 0;i < polySize(v2);i++){
-		v2.items[i].coefficient *= -1;
+		v2.items[i].coefficient = mulK(v2.items[i].coefficient,JOHO_NO_TANIGEN_NO_KAHO_NO_GYAKUGEN);
 	}
 	return retval;
 }
@@ -201,12 +271,13 @@ Poly polyMul(unmut Poly v1,unmut Poly v2){
 		DIE;
 	}
 	if(isNullPoly(v1) || isNullPoly(v2)){
+		DIE;
 		return nullPoly;
 	}
 	int i,j,k,index;
 	Poly retval = {
 		.size = 0,
-		.items = malloc(sizeof(Item)*polySize(v1)*polySize(v2))
+		.items = malloc(sizeof(Item)*(polySize(v1)*polySize(v2) + 1))
 	};
 	index = 0;
 	for(i = 0;i < polySize(v1);i++){
@@ -216,13 +287,13 @@ Poly polyMul(unmut Poly v1,unmut Poly v2){
 				for(k = 0;k < v2.items[j].size ;k++){
 					retval.items[index].degrees[k] += v2.items[j].degrees[k];
 				}
-				retval.items[index].coefficient *= v2.items[j].coefficient;
+				retval.items[index].coefficient = mulK(retval.items[index].coefficient, v2.items[j].coefficient);
 			}else{
 				retval.items[index] = _copyItem(v2.items[j]);
 				for(k = 0;k < v1.items[i].size ;k++){
 					retval.items[index].degrees[k] += v1.items[i].degrees[k];
 				}
-				retval.items[index].coefficient *= v1.items[i].coefficient;
+				retval.items[index].coefficient = mulK(retval.items[index].coefficient, v1.items[i].coefficient);
 			}
 			index++;
 		}
@@ -232,6 +303,10 @@ Poly polyMul(unmut Poly v1,unmut Poly v2){
 	setPolyType(retval,order);
 	Poly tmp = retval;
 	retval = polySort(retval,order);
+	if(isNullPoly(retval)){
+		fprintf(stderr,"FUCK\n");
+		DIE;
+	}
 	polyFree(tmp);
 	return retval;
 }
@@ -251,11 +326,18 @@ int _isDiviable(unmut Item dividend,unmut Item divisor){
 
 /*This function returns array of Poly whose length is (size + 1).*/
 /*divisor must be array of Poly whose length is 'size'*/
-Poly * polyDiv(unmut Poly dividend,unmut Poly *divisor,unmut size_t size){
+Poly polyDiv(unmut Poly dividend,unmut Poly divisors){
 	int i,j,k;
 	MonomialOrder order = polyType(dividend);
+	size_t size = polySize(divisors);
 	Poly h = polyDup(dividend);
 	Item *in_g = malloc(sizeof(Item) * size);
+	Poly *divisor;
+	if(polyType(divisors) == ARRAY){
+		divisor = unwrapPolyArray(divisors);
+	}else{
+		divisor = &divisors;
+	}
 	for(i = 0;i < size;i++){
 		in_g[i] = __polyIn(divisor[i]);
 	}
@@ -263,8 +345,8 @@ Poly * polyDiv(unmut Poly dividend,unmut Poly *divisor,unmut size_t size){
 	for(i = 0;i < size;i++){
 		setPolySize(retval[i],1);
 		setPolyType(retval[i],order);
-		retval[i].items = malloc(sizeof(Item));
-		retval[i].items[0].coefficient = 0;
+		retval[i].items = malloc(sizeof(Item)*2);
+		retval[i].items[0].coefficient = KAHO_NO_TANIGEN;
 		retval[i].items[0].size = 0;
 		retval[i].items[0].degrees = NULL;	
 	}
@@ -273,16 +355,16 @@ Poly * polyDiv(unmut Poly dividend,unmut Poly *divisor,unmut size_t size){
 		exists = 0;
 		for(i = 0;i < size;i++){
 			for(j = 0;j < polySize(h);j++){
-				if(_isDiviable(h.items[j],in_g[i])){
+				if(_isDiviable(h.items[0],in_g[i])){
 					exists = 1;
-					unmut Item u = h.items[j];
+					unmut Item u = h.items[0];
 					unmut Item g = in_g[i];
 					K c_gi = g.coefficient;
 					K c_f = u.coefficient;
 					Item w = {
 						.size = u.size,
 						.degrees = malloc(sizeof(N)*u.size),
-						.coefficient = c_f / c_gi
+						.coefficient = divK(c_f , c_gi)
 					};
 					for(k = 0;k < g.size;k++){
 						w.degrees[k] = u.degrees[k] - g.degrees[k];
@@ -299,25 +381,17 @@ Poly * polyDiv(unmut Poly dividend,unmut Poly *divisor,unmut size_t size){
 						w.size = k;
 						w.degrees = realloc(w.degrees,k);
 					}
-					Poly tmp = {
-						.items = malloc(sizeof(Item))
-					};
-					tmp.items[0] = w;
-					setPolySize(tmp,1);
+					Poly tmp = item2Poly(w);
 					setPolyType(tmp,order);
 					Poly temp = polyMul(tmp,divisor[i]);
-					free(tmp.items);
 					Poly tempo = polySub(h,temp);polyFree(temp);polyFree(h);
 					h = tempo;
-					if(retval[i].size == 1 && retval[i].items[0].size == 0 && retval[i].items[0].coefficient == 0){
-						/*NEW!!*/
-						retval[i].items[0] = w;
-					}else{
-						/*already here*/
-						Poly newVal = appendItem2Poly(retval[i],w);
-						retval[i] = polySort(newVal,order);
-						polyFree(newVal);
-					}
+					Poly newVal = polyAdd(retval[i],tmp);
+					polyFree(retval[i]);
+					retval[i] = newVal;
+					polyFree(tmp);
+					polyPrint(h,stdout);
+					printf("\n");
 				}
 			}
 		}
@@ -326,6 +400,57 @@ Poly * polyDiv(unmut Poly dividend,unmut Poly *divisor,unmut size_t size){
 		}
 	};
 	retval[size] = h;
+	return mkPolyArray(retval,size+1);
+}
+
+Poly polySim(unmut Poly dividend,unmut Poly divisors){
+	Poly result = polyDiv(dividend,divisors);
+	size_t size = polySize(result) - 1;
+	setPolySize(result,size);
+	Poly ret = ((Poly *)result.items)[size];
+	polyFree(result);
+	return ret;
+}
+
+#define MAX(x,y,index) (index >= x.size) ? y.degrees[index] : ( \
+						(index >= y.size) ? x.degrees[index] : (\
+						(x.degrees[index] > y.degrees[index]) ? x.degrees[index] : y.degrees[index]))
+
+Poly polyS(unmut Poly f,unmut Poly g){
+	MonomialOrder order = polyType(f);
+	if(order != polyType(g)){
+		fprintf(stderr,"S polynomial of different polynomials cannnot be computed\n");
+		DIE;
+	}
+	Item in_f = __polyIn(f);
+	Item in_g = __polyIn(g);
+	Item w_f = {
+		.size = (in_f.size < in_g.size) ? in_g.size : in_f.size,
+		.degrees = malloc(sizeof(N)*w_f.size),
+		.coefficient = JOHO_NO_TANIGEN
+	};
+	Item w_g = {
+		.size = (in_f.size < in_g.size) ? in_g.size : in_f.size,
+		.degrees = malloc(sizeof(N)*w_g.size),
+		.coefficient = JOHO_NO_TANIGEN
+	};
+	
+	size_t i;
+	for(i = 0;i < w_f.size;i++){
+		w_f.degrees[i] = MAX(in_f,in_g,i) - in_f.degrees[i];
+	}
+	for(i = 0;i < w_g.size;i++){
+		w_g.degrees[i] = MAX(in_f,in_g,i) - in_g.degrees[i];
+	}
+	w_f.coefficient = divK(JOHO_NO_TANIGEN,in_f.coefficient);
+	w_g.coefficient = divK(JOHO_NO_TANIGEN,in_g.coefficient);
+	Poly w_f_p = item2Poly(w_f);
+	Poly w_g_p = item2Poly(w_g);
+	setPolyType(w_f_p,order);
+	setPolyType(w_g_p,order);
+	Poly tmp_f = polyMul(w_f_p,f); polyFree(w_f_p);
+	Poly tmp_g = polyMul(w_g_p,g); polyFree(w_f_p);
+	Poly retval = polyAdd(tmp_f,tmp_g); polyFree(tmp_f);polyFree(tmp_g);
 	return retval;
 }
 
@@ -446,30 +571,53 @@ Poly polySort(unmut Poly poly,MonomialOrder order){
 					,(int (*)(const void *,const void *))polyCMP_RLEX); setPolyType(toBeSorted,RLEX); break;}
 		case PLEX : {qsort(toBeSorted.items,polySize(toBeSorted),sizeof(Item)
 					,(int (*)(const void *,const void *))polyCMP_PLEX); setPolyType(toBeSorted,PLEX); break;}
+		default   : { DIE;}
 	}
 	Poly retval = {
 		.size = toBeSorted.size, /*Copy entire toBeSorted.size. That is, both type of monomial order and size of *items*/
 		.items = malloc(sizeof(Item) * polySize(toBeSorted))
 	};
 	int index = 0;
+	int someThingDisappeared = 0;
 	int i,j;
 	for(i = 0;i < polySize(toBeSorted);i++){
 		retval.items[index] = toBeSorted.items[i];
 		for(j = i + 1;j < polySize(toBeSorted) && _isSameMonomial(toBeSorted.items[i],toBeSorted.items[j]);j++){
-			retval.items[index].coefficient += toBeSorted.items[j].coefficient;
+			retval.items[index].coefficient = addK(retval.items[index].coefficient, toBeSorted.items[j].coefficient);
 			free(toBeSorted.items[j].degrees);
 		}
-		if(retval.items[index].coefficient == 0){
+		if(!cmpK(retval.items[index].coefficient , KAHO_NO_TANIGEN)){
 			free(retval.items[index].degrees);
 			index--;
+			someThingDisappeared = 1;
 		}
 		i = j - 1;
 		index++;
 	}
-	if(retval.size != index){
+	if(index == 0 && someThingDisappeared){
+		index = 1;
+		setPolySize(retval,index);
+		retval.items = realloc(retval.items,sizeof(Item)*2);
+		retval.items[0].degrees = NULL;
+		retval.items[0].size = 0;
+		retval.items[0].coefficient = K_0;
+	}else if(polySize(retval) != index){
 		setPolySize(retval,index);
 		retval.items = realloc(retval.items,sizeof(Item)*polySize(retval));
 	}
 	return retval;
 }
-
+Poly mkPolyArray(mut Poly *array,size_t size){
+	Poly retval;
+	retval.size = 0;
+	setPolySize(retval,size);
+	setPolyType(retval,ARRAY);
+	retval.items = (Item *)array;
+	return retval;
+}
+Poly * unwrapPolyArray(mut Poly poly){
+	if(polyType(poly)!=ARRAY){
+		return NULL;
+	}
+	return (Poly *)poly.items;
+}

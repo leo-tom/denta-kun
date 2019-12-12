@@ -40,16 +40,40 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 extern FILE *OUTFILE;
 
-typedef double Numeric;
+typedef struct {
+	int64_t numerator;
+    int64_t denominator;
+}Q;
+
+typedef Q Numeric;
 typedef uint64_t Natural;
 
 typedef Numeric K;
 typedef Natural N;
 
+extern const K JOHO_NO_TANIGEN; //1
+extern const K KAHO_NO_TANIGEN; //0
+extern const K JOHO_NO_TANIGEN_NO_KAHO_NO_GYAKUGEN; //-1
+
+#define K_1 JOHO_NO_TANIGEN
+#define K_0 KAHO_NO_TANIGEN 
+#define K_N1 JOHO_NO_TANIGEN_NO_KAHO_NO_GYAKUGEN
+
+int cmpK(const K v1,const K v2);
+K str2K(const char *str);
+char * K2str(const K k,char *buff);
+double K2double(const K k);
+K addK(const K v1,const K v2);
+K subK(const K v1,const K v2);
+K mulK(const K v1,const K v2);
+K divK(const K v1,const K v2);
+
+
 typedef enum _MonomialOrder{
 	LEX,
 	RLEX,
-	PLEX
+	PLEX,
+	ARRAY
 }MonomialOrder;
 
 typedef struct{
@@ -61,16 +85,20 @@ typedef struct{
 #define MONOMIAL_ORDER_IN_BIN__LEX (0)
 #define MONOMIAL_ORDER_IN_BIN__RLEX (1)
 #define MONOMIAL_ORDER_IN_BIN__PLEX (2)
+#define MONOMIAL_ORDER_IN_BIN__ARRAY (3)
 
 #define polySize(p) (p.size & 0xfffffffffffffff)
 #define polyType(p) ((p.size >> 60) == MONOMIAL_ORDER_IN_BIN__RLEX ? RLEX : \
-					 ((p.size >> 60) == MONOMIAL_ORDER_IN_BIN__PLEX ? PLEX : LEX))
+					 ((p.size >> 60) == MONOMIAL_ORDER_IN_BIN__PLEX ? PLEX : ( \
+					  (p.size >> 60) == MONOMIAL_ORDER_IN_BIN__LEX ? LEX : ARRAY)))
 #define setPolySize(p,newSize) do{ p.size &= ((int64_t)0xf) << 60;p.size |= (0xfffffffffffffff & (newSize));}while(0)
 #define setPolyType(p,t) do{p.size &= 0xfffffffffffffff; \
 							if( t == RLEX ){ \
 							 p.size |= (int64_t)MONOMIAL_ORDER_IN_BIN__RLEX << 60 ;\
 							}else if(t == PLEX){\
 							 p.size |= (int64_t)MONOMIAL_ORDER_IN_BIN__PLEX << 60;\
+							}else if(t == ARRAY){ \
+							 p.size |= (int64_t)MONOMIAL_ORDER_IN_BIN__ARRAY << 60;\
 							}else{\
 							 p.size |= (int64_t)MONOMIAL_ORDER_IN_BIN__LEX << 60;}}while(0)
 
@@ -100,13 +128,13 @@ typedef struct{
 typedef struct{
 	char name[8];
 	char description[64];
-	Poly (*funcptr)(Poly *,size_t,BlackBoard);
+	Poly (*funcptr)(Poly ,BlackBoard);
 }Function;
 
 extern const Function BUILT_IN_FUNCS[];
 extern const size_t BUILT_IN_FUNC_SIZE;
 
-Poly callBuiltInFunc(const char *name,Poly *array, size_t size,BlackBoard blackboard);
+Poly callBuiltInFunc(const char *name,Poly arg,BlackBoard blackboard);
 
 extern const Poly nullPoly;
 extern const Definition nullDefinition;
@@ -130,15 +158,21 @@ Poly polySub(unmut Poly v1,unmut Poly v2);
 Poly polyMul(unmut Poly v1,unmut Poly v2);
 /*This function returns array of Poly whose length is (size + 1).*/
 /*divisor must be array of Poly whose length is 'size'*/
-Poly * polyDiv(unmut Poly dividend,unmut Poly *divisor,unmut size_t size);
+Poly polyDiv(unmut Poly dividend,unmut Poly divisor);
+Poly polySim(unmut Poly dividend,unmut Poly divisors);
+Poly polyS(unmut Poly f,unmut Poly g);
 
+Item __polyIn(unmut Poly poly);
 Item _polyIn(unmut Poly poly);
 Poly polyIn(unmut Poly poly);
+Poly item2Poly(mut Item item);
 Poly polySort(unmut Poly poly,MonomialOrder order);
 void polyPrint(unmut Poly poly,FILE *fp);
 Poly appendItem2Poly(mut Poly poly,mut Item item);
 double poly2Double(unmut Poly poly);
 Poly polyDup(unmut Poly poly);
 void polyFree(mut Poly v);
+Poly mkPolyArray(mut Poly *array,size_t size);
+Poly * unwrapPolyArray(mut Poly poly);
 
 #endif

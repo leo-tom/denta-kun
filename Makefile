@@ -1,6 +1,6 @@
 #options = -02 -Wall
 options = -g -ggdb -Wall -DDEBUG=1
-objs = main.o parser.o poly-funcs.o black-board.o builtin-funcs.o
+objs = main.o parser.o poly-funcs.o black-board.o builtin-funcs.o K.o
 headers = denta-kun.h
 CC = gcc
 RM = rm
@@ -23,6 +23,9 @@ black-board.o : black-board.c
 	$(CC) $(options) -c $<
 
 builtin-funcs.o : builtin-funcs.c
+	$(CC) $(options) -c $<
+
+K.o : K.c
 	$(CC) $(options) -c $<
 
 clean :

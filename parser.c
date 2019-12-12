@@ -90,7 +90,6 @@ Node * __parser(FILE *stream){
 			}
 			case '=':
 			case '+':
-			case '-':
 			case '^':
 			case '_':
 			case ',':
@@ -98,6 +97,15 @@ Node * __parser(FILE *stream){
 				char buff[2];
 				buff[0] = c; buff[1] = 0;
 				append(head,butt,command,buff);
+				break;
+			}
+			case '-':
+			{
+				char buff[16] = {0};
+				buff[0] = '+'; buff[1] = 0;
+				append(head,butt,command,buff);
+				strcpy(buff,"-1");
+				append(head,butt,Number,buff);
 				break;
 			}
 			case '\\':
@@ -224,61 +232,72 @@ void _print_parsed_tex(Node *n,FILE *fp){
 #endif
 extern Poly _parser(Node *head,Node *tail,BlackBoard blackboard);
 
-Poly _callFunc(const char *funcName,Node *block,BlackBoard blackboard){
-	size_t size = 2;
-	size_t index = 0;
-	Poly *array = malloc(sizeof(Poly) * size);
-	
-	Node *head;
-	head = block;
-	while(head){
-		Node *tail = head->next;
-		while(tail != NULL && (tail->type != Command && strcmp(tail->str,","))){
-			tail = tail->next;
-		}
-		if(index >= size){
-			size += 5;
-			array = realloc(array,sizeof(Poly) * size);
-		}
-		Poly tmp = _parser(head,tail,blackboard);
-		array[index++] = tmp;
-		head = (tail != NULL) ? tail->next : NULL;
-	}
-	if(index < size){
-		size = index;
-		array = realloc(array,sizeof(Poly) * size);
-	}
-	Poly retval = callBuiltInFunc(funcName,array,size,blackboard);
-	for(index = 0;index < size;index++){
-		polyFree(array[index]);
-	}
-	return retval;
-}
 Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
-	Node *now = head;
-	
-	if(now == NULL){
+	if(head == NULL || head == tail){
 		return nullPoly;
 	}
-	
+	Node *now = head;
+	size_t capacity = 8;
+	Poly *ptr = (Poly *)malloc(sizeof(Poly) * capacity);
+	size_t s = 0;
+	while(now!=tail && now!=NULL){
+		if(now->type == Command && !strcmp(now->str,",")){
+			if(s >= capacity){
+				capacity *= 2;
+				ptr = realloc(ptr,sizeof(Poly) * capacity);
+			}
+			ptr[s++] = _parser(head,now,blackboard);
+			head = now->next;
+		}
+		now = now->next;
+	}
+	if(s > 0){
+		s++;
+		if(s != capacity){
+			capacity = s;
+			ptr = realloc(ptr,sizeof(Poly) * capacity);
+		}
+		ptr[s - 1] = _parser(head,now,blackboard);
+		return mkPolyArray(ptr,s);
+	}else{
+		free(ptr);
+	}
+	now = head;
 	while(now != tail && now != NULL){
 		switch(now->type){
 			case Command:{
 				if(!strcmp(now->str,"+")){
 					Poly pLeft = _parser(head,now,blackboard);
-					Poly pRight = _parser(now->next,NULL,blackboard);
-					Poly retval = polyAdd(pLeft,pRight);
+					Poly pRight = _parser(now->next,tail,blackboard);
+					Poly retval;
+					if(head != now){ 
+						retval = polyAdd(pLeft,pRight);
+					}else{
+						return pRight;
+						
+					}
 					polyFree(pLeft);
 					polyFree(pRight);
 					return retval;
-				}else if(!strcmp(now->str,"-")){
+				}/*
+				else if(!strcmp(now->str,"-")){
 					Poly pLeft = _parser(head,now,blackboard);
 					Poly pRight = _parser(now->next,NULL,blackboard);
-					Poly retval = polySub(pLeft,pRight);
+					Poly retval;
+					if(head != now){ 
+						retval = polySub(pLeft,pRight);
+					}else{
+						retval = pRight;
+						size_t i;
+						for(i = 0;i < polySize(retval);i++){
+							retval.items[i].coefficient = mulK(K_N1,retval.items[i].coefficient);
+						}
+						return retval;
+					}
 					polyFree(pLeft);
 					polyFree(pRight);
 					return retval;
-				}
+				}*/
 				break;
 			}
 			default:{
@@ -294,7 +313,7 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 			case Command:{
 				if(!strcmp(now->str,"times") || !strcmp(now->str,"cdot")){
 					Poly pLeft = _parser(head,now,blackboard);
-					Poly pRight = _parser(now->next,NULL,blackboard);
+					Poly pRight = _parser(now->next,tail,blackboard);
 					Poly retval = polyMul(pLeft,pRight);
 					polyFree(pLeft);
 					polyFree(pRight);
@@ -310,9 +329,11 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 	}
 	
 	Poly retval = {
-		.items = malloc(sizeof(Item)*1)
+		.items = malloc(sizeof(Item)*2) 
+		//For some reason, when I pass sizeof(Item) to malloc, allocated space get over written.
+		//This must be a bug of compiler!!!!!!! Not my fault!
 	};
-	retval.items[0].coefficient = 1;
+	retval.items[0].coefficient = K_1;
 	retval.items[0].degrees = NULL;
 	retval.items[0].size = 0;
 	setPolySize(retval,1);
@@ -323,18 +344,49 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 		switch(now->type){
 			case Command:{
 				const char *str = now->str;
-				now = now->next;
-				if(now == NULL || now->type != Block){
-					fprintf(stderr,"\'{\' or \'(\' is expected after a call of function\n");
-					DIE;
+				if(!strcmp(str,"frac")){
+					if(now->next == NULL || now->next->next == NULL ){
+						fprintf(stderr,"Invalid \\frac declaration\n");
+						DIE;
+					}
+					Node *nBunsi = now->next;
+					Node *nBunbo = now->next->next;
+					now = now->next->next->next;
+					Poly bunbo = _parser(nBunbo,nBunbo->next,blackboard);
+					Poly bunsi = _parser(nBunsi,nBunsi->next,blackboard);
+					if(bunbo.size == 1 && bunsi.size == 1 && bunbo.items[0].size == 0 && bunsi.items[0].size == 0){
+						Item w = {
+							.size = 0,
+							.coefficient = divK(bunsi.items[0].coefficient,bunbo.items[0].coefficient),
+							.degrees = NULL
+						};
+						Poly mulDis = item2Poly(w);
+						Poly tmp = polyMul(retval,mulDis);polyFree(mulDis);
+						polyFree(retval);
+						retval = tmp;
+					}else{
+						DIE;
+					}
+				}else{
+					now = now->next;
+					if(now == NULL || now->type != Block){
+						fprintf(stderr,"\'{\' or \'(\' is expected after a call of function\n");
+						DIE;
+					}
+					blackboard = sortBlackBoard(blackboard);
+					Poly p = callBuiltInFunc(str,_parser(*((Node **)&now->str),NULL,blackboard),blackboard);
+					if(polyType(p) == ARRAY){
+						polyFree(retval);
+						return p;
+					}else if(isNullPoly(p)){
+						return p;
+					}
+					Poly tmp = polyMul(retval,p);
+					polyFree(p);
+					polyFree(retval);
+					retval = tmp;
+					now = now->next;
 				}
-				blackboard = sortBlackBoard(blackboard);
-				Poly p = _callFunc(str,*((Node **)&now->str),blackboard);
-				Poly tmp = polyMul(retval,p);
-				polyFree(p);
-				polyFree(retval);
-				retval = tmp;
-				now = now->next;
 				break;
 			}
 			case Block:{
@@ -347,10 +399,10 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 				break;
 			}
 			case Number:{
-				K val = atof(now->str);
+				K val = str2K(now->str);
 				int i = 0;
 				for(i = 0;i < polySize(retval);i++){
-					retval.items[i].coefficient *= val;
+					retval.items[i].coefficient = mulK(retval.items[i].coefficient,val);
 				}
 				now = now->next;
 				break;
@@ -400,7 +452,7 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 					Item item = {
 						.size = (index + 1),
 						.degrees = calloc(index + 1,sizeof(N)),
-						.coefficient = 1
+						.coefficient = JOHO_NO_TANIGEN
 					};
 					item.degrees[index] = degrees;
 					
@@ -418,6 +470,10 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 				}else{
 					Poly mulDis = findFromBlackBoard(blackboard,now->str,strlen(now->str));
 					if(isNullPoly(mulDis) ) {fprintf(stderr,"Variable %s undefined.\n",now->str);DIE;}
+					if(polyType(mulDis) == ARRAY){
+						polyFree(retval);
+						return mulDis;
+					}
 					if(polyType(mulDis) != LEX){
 						Poly temp = polySort(mulDis,LEX); polyFree(mulDis);
 						mulDis = temp;
