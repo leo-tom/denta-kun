@@ -46,7 +46,8 @@ typedef struct {
 }Q;
 
 typedef Q Numeric;
-typedef uint64_t Natural;
+//typedef uint64_t Natural;
+typedef int64_t Natural;
 
 typedef Numeric K;
 typedef Natural N;
@@ -102,12 +103,15 @@ typedef struct{
 							}else{\
 							 p.size |= (int64_t)MONOMIAL_ORDER_IN_BIN__LEX << 60;}}while(0)
 
-typedef struct{
+typedef struct __Poly__{
 	/*Assume size_t is 64 bit long. If not, this is not gonna work.*/
 	/*lower 60 bits are used to store size of an array *items*/
 	/*upper 4 bits are used to store monomial order that is used in this Poly.*/
 	size_t size;
-	Item *items;
+	union{
+		Item *items;
+		struct __Poly__ *polies;
+	}ptr;
 }Poly;
 
 #define DEFINITION_BYTES_SIZE (16)
@@ -174,5 +178,8 @@ Poly polyDup(unmut Poly poly);
 void polyFree(mut Poly v);
 Poly mkPolyArray(mut Poly *array,size_t size);
 Poly * unwrapPolyArray(mut Poly poly);
+
+Poly isThisGrobnerBasis(unmut Poly array);
+Poly GrobnerBasis2ReducedGrobnerBasis(mut Poly grobner);
 
 #endif

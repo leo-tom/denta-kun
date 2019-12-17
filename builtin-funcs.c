@@ -78,113 +78,35 @@ Poly builtIn_SP(Poly arg,BlackBoard blackboard){
 	return retval;
 }
 
-int _isCoprime(Item v1,Item v2){
-	size_t s = v1.size > v2.size ? v2.size : v1.size;
-	size_t i;
-	for(i = 0;i < s;i++){
-		if(v1.degrees[i] && v2.degrees[i]){
-			return 0;
-		}
-	}
-	return 1;
-}
-
-/*Returns 0 if array is grobner basis*/
-/*Returns reminder of S(g_i,g_j) divided by array*/
-Poly _isThisGrobnerBasis(Poly array){
-	size_t s = polySize(array);
-	Poly *ptr = (Poly *) unwrapPolyArray(array);
-	Item *in = malloc(sizeof(Item)*s);
-	size_t i,j;
-	for(i = 0;i < s;i++){
-		in[i] = __polyIn(ptr[i]);
-	}
-	Poly reminder;
-	for(i = 0;i < s;i++){
-		for(j = i + 1;j < s;j++){
-			if(_isCoprime(in[i],in[j])){
-				break;
-			}
-			Poly s_i_j = polyS(ptr[i],ptr[j]);
-			reminder = polySim(s_i_j,array);polyFree(s_i_j);
-			if(polySize(reminder) == 1 && cmpK(reminder.items[0].coefficient, K_0)){
-				polyFree(reminder);
-			}else{
-				goto ret;
-			}
-			Poly s_j_i = polyS(ptr[j],ptr[i]);
-			reminder = polySim(s_j_i,array);polyFree(s_j_i);
-			if(polySize(reminder) == 1 && cmpK(reminder.items[0].coefficient, K_0)){
-				polyFree(reminder);
-			}else{
-				goto ret;
-			}
-		}
-	}
-	Item item = {
-		.size = 1,
-		.coefficient = K_0,
-		.degrees = NULL
-	};
-	reminder = item2Poly(item);
-	MonomialOrder order = polyType(ptr[0]);
-	setPolyType(reminder,order);
-	ret:
-	free(in);
-	return reminder;
-}
-Poly _grobnerBasis2ReducedGrobnerBasis(mut Poly grobner){
-	size_t i;
-	size_t size = polySize(grobner);
-	Poly *ptr = unwrapPolyArray(grobner);
-	ptr = realloc(ptr , size * 2 * sizeof(Poly));
-	
-	for(i = 0;i < size;i++){
-		Poly divisors = mkPolyArray(&ptr[i+1],size - 1);
-		Poly r = polySim(ptr[i],divisors);
-		ptr[i + size] = r;
-	}
-	Poly *newArray = malloc(sizeof(Poly)*size);
-	size_t index = 0;
-	for(i = 0;i < size;i++){
-		polyFree(ptr[i]);
-		Poly p = ptr[i + size];
-		if(p.size == 1 && !cmpK(p.items[0].coefficient , K_0)){
-			polyFree(p);
-			continue;
-		}else{
-			size_t j;
-			K gyaku = divK(K_1,p.items[0].coefficient);
-			for(j = 0;j < polySize(p);j++){
-				p.items[j].coefficient = mulK(gyaku,p.items[j].coefficient);
-			}
-			newArray[index++] = p;
-		}
-	}
-	free(ptr);
-	if(size != index){
-		size = index;
-		newArray = realloc(newArray,sizeof(Poly) * size);
-	}
-	return mkPolyArray(newArray,size);
-}
 Poly builtIn_BBA(Poly array,BlackBoard blackboard){
 	Poly r;
 	size_t capacity = polySize(array);
 	size_t i = polySize(array);
-	while((r=_isThisGrobnerBasis(array)).size >= 1 && !cmpK(r.items[0].coefficient,K_0)){
+	do{
+		r = isThisGrobnerBasis(array);
+		polyPrint(array,stdout);
+		printf("is ");
+		if(r.size == 1 && !cmpK(r.ptr.items[0].coefficient,K_0)){
+			printf("Grobner basis.\n ");
+			polyFree(r);
+			break;
+		}
+		printf("not Grobner basis because : \n");
+		polyPrint(r,stdout);
+		printf("is not empty.\n");
 		if(i >= capacity){
 			capacity *= 2;
-			array.items = realloc(array.items,capacity * sizeof(Poly));
+			array.ptr.polies = realloc(array.ptr.polies,capacity * sizeof(Poly));
 		}
-		((Poly *)array.items)[i] = r;
+		array.ptr.polies[i] = r;
 		i++;
-	}
+		setPolySize(array,i);
+	}while(1);
 	if(i < capacity){
-		array.items = realloc(array.items,i * sizeof(Poly));
+		array.ptr.polies = realloc(array.ptr.polies,i * sizeof(Poly));
 	}
 	setPolySize(array,i);
-	return _grobnerBasis2ReducedGrobnerBasis(array);
+	return GrobnerBasis2ReducedGrobnerBasis(array);
 }
 Poly builtIn_SIM(Poly arg,BlackBoard blackboard){
 	if(polyType(arg) != ARRAY && polySize(arg) != 2){

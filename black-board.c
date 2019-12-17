@@ -31,7 +31,7 @@ const Definition nullDefinition = {
 	.bytes = {0},
 	.poly =	{
 		.size = -1,
-		.items = NULL
+		.ptr.items = NULL
 	},
 };
 

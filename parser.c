@@ -114,7 +114,7 @@ Node * __parser(FILE *stream){
 					return head;
 				}
 				ungetc(c,stream);
-				char _buff[256];
+				char _buff[256] = {0};
 				char *buff = _buff;
 				while(isalpha(c = getNextChar(stream)) ){
 					*buff++ = c;
@@ -148,7 +148,7 @@ Node * __parser(FILE *stream){
 			default :
 			{
 				if(isdigit(c) || c == '-'){
-					char _buff[256];
+					char _buff[256] = {0};
 					char *buff = _buff;
 					*buff++ = c;
 					while(isdigit(c = getNextChar(stream)) || c == '.' ){
@@ -181,7 +181,7 @@ Node * __parser(FILE *stream){
 						append(head,butt,variable,_buff);
 					}
 				}else{
-					fprintf(stderr,"I dont know how to parse \'%c\'[%x]\n",c,c);
+					fprintf(stderr,"Unknown char\'%c\'[%x]\n",c,c);
 					DIE;
 				}
 				break;
@@ -238,7 +238,7 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 	}
 	Node *now = head;
 	size_t capacity = 8;
-	Poly *ptr = (Poly *)malloc(sizeof(Poly) * capacity);
+	Poly *ptr = malloc(sizeof(Poly) * capacity);
 	size_t s = 0;
 	while(now!=tail && now!=NULL){
 		if(now->type == Command && !strcmp(now->str,",")){
@@ -258,6 +258,9 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 			ptr = realloc(ptr,sizeof(Poly) * capacity);
 		}
 		ptr[s - 1] = _parser(head,now,blackboard);
+		if(isNullPoly(ptr[s-1])){
+			s--;
+		}
 		return mkPolyArray(ptr,s);
 	}else{
 		free(ptr);
@@ -279,25 +282,7 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 					polyFree(pLeft);
 					polyFree(pRight);
 					return retval;
-				}/*
-				else if(!strcmp(now->str,"-")){
-					Poly pLeft = _parser(head,now,blackboard);
-					Poly pRight = _parser(now->next,NULL,blackboard);
-					Poly retval;
-					if(head != now){ 
-						retval = polySub(pLeft,pRight);
-					}else{
-						retval = pRight;
-						size_t i;
-						for(i = 0;i < polySize(retval);i++){
-							retval.items[i].coefficient = mulK(K_N1,retval.items[i].coefficient);
-						}
-						return retval;
-					}
-					polyFree(pLeft);
-					polyFree(pRight);
-					return retval;
-				}*/
+				}
 				break;
 			}
 			default:{
@@ -329,13 +314,13 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 	}
 	
 	Poly retval = {
-		.items = malloc(sizeof(Item)*2) 
+		.ptr.items = malloc(sizeof(Item)*2) 
 		//For some reason, when I pass sizeof(Item) to malloc, allocated space get over written.
 		//This must be a bug of compiler!!!!!!! Not my fault!
 	};
-	retval.items[0].coefficient = K_1;
-	retval.items[0].degrees = NULL;
-	retval.items[0].size = 0;
+	retval.ptr.items[0].coefficient = K_1;
+	retval.ptr.items[0].degrees = NULL;
+	retval.ptr.items[0].size = 0;
 	setPolySize(retval,1);
 	setPolyType(retval,LEX);
 	
@@ -354,10 +339,10 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 					now = now->next->next->next;
 					Poly bunbo = _parser(nBunbo,nBunbo->next,blackboard);
 					Poly bunsi = _parser(nBunsi,nBunsi->next,blackboard);
-					if(bunbo.size == 1 && bunsi.size == 1 && bunbo.items[0].size == 0 && bunsi.items[0].size == 0){
+					if(bunbo.size == 1 && bunsi.size == 1 && bunbo.ptr.items[0].size == 0 && bunsi.ptr.items[0].size == 0){
 						Item w = {
 							.size = 0,
-							.coefficient = divK(bunsi.items[0].coefficient,bunbo.items[0].coefficient),
+							.coefficient = divK(bunsi.ptr.items[0].coefficient,bunbo.ptr.items[0].coefficient),
 							.degrees = NULL
 						};
 						Poly mulDis = item2Poly(w);
@@ -402,7 +387,7 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 				K val = str2K(now->str);
 				int i = 0;
 				for(i = 0;i < polySize(retval);i++){
-					retval.items[i].coefficient = mulK(retval.items[i].coefficient,val);
+					retval.ptr.items[i].coefficient = mulK(retval.ptr.items[i].coefficient,val);
 				}
 				now = now->next;
 				break;
@@ -457,9 +442,9 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 					item.degrees[index] = degrees;
 					
 					Poly mulDis = {
-						.items = malloc(sizeof(Item))
+						.ptr.items = malloc(sizeof(Item))
 					};
-					mulDis.items[0] = item;
+					mulDis.ptr.items[0] = item;
 					setPolySize(mulDis,1);
 					setPolyType(mulDis,LEX);
 					

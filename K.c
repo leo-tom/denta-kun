@@ -53,18 +53,31 @@ int64_t _gcd(int64_t m,int64_t n){
     }
     return _gcd(n,m%n);
 }
+int64_t gcd(int64_t m,int64_t n){
+	n = (n < 0) ? -1 * n : n;
+	m = (m < 0) ? -1 * m : m;
+	if(m < n){
+		int64_t tmp = m;
+		m = n;
+		n = tmp;
+	}
+    return _gcd(m,n);
+}
 
 Q niceQ(Q this){
-    int64_t gcd = _gcd((this.numerator >= this.denominator) ? this.numerator : this.denominator,
+    int64_t gcd_val = gcd((this.numerator >= this.denominator) ? this.numerator : this.denominator,
                          (this.numerator < this.denominator) ? this.numerator : this.denominator);
-    this.numerator /= gcd;
-    this.denominator /= gcd;
+    this.numerator /= gcd_val;
+    this.denominator /= gcd_val;
     if(this.numerator < 0 && this.denominator < 0){
         this.numerator *= -1;
         this.denominator *= -1;
     }else if((this.numerator >= 0 && this.denominator < 0 )){
         this.numerator *= -1;
         this.denominator *= -1;
+    }
+    if(this.denominator == 0){
+    	fprintf(stderr,"\n");
     }
     return this;
 }
@@ -127,7 +140,10 @@ char * toString(Q this,char *buff){
 Q operatorAdd(const Q this,const Q m){
     const Q larger = (this.denominator >= m.denominator) ? this : m;
     const Q smaller = (this.denominator < m.denominator) ? this : m;
-    const int64_t denomGCD = _gcd(larger.denominator,smaller.denominator);
+    const int64_t denomGCD = gcd(larger.denominator,smaller.denominator);
+    if(denomGCD == 0){
+    	fprintf(stderr,"\n");
+    }
     int64_t numeratorL = this.numerator * (m.denominator/denomGCD);
     int64_t numeratorR = m.numerator * (this.denominator/denomGCD);
     Q ret = mkQ(numeratorL + numeratorR,this.denominator * (m.denominator/denomGCD));
@@ -136,7 +152,7 @@ Q operatorAdd(const Q this,const Q m){
 Q operatorSub(const Q this,const Q m){
     const Q larger = (this.denominator >= m.denominator) ? this : m;
     const Q smaller = (this.denominator < m.denominator) ? this : m;
-    const int64_t denomGCD = _gcd(larger.denominator,smaller.denominator);
+    const int64_t denomGCD = gcd(larger.denominator,smaller.denominator);
     int64_t numeratorL = this.numerator * (m.denominator/denomGCD);
     int64_t numeratorR = m.numerator * (this.denominator/denomGCD);
     Q ret = mkQ(numeratorL - numeratorR,this.denominator * (m.denominator/denomGCD));
@@ -190,8 +206,7 @@ K str2K(const char *str){
 	return niceQ(retval);	
 }
 char * K2str(const K k,char *buff){
-	K tmp = niceQ(k);
-	sprintf(buff,"\\frac{%ld}{%ld}",tmp.numerator,tmp.denominator);
+	sprintf(buff,"\\frac{%ld}{%ld}",k.numerator,k.denominator);
 	return buff;
 }
 
