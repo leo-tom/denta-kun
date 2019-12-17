@@ -31,6 +31,8 @@ const Poly nullPoly = {
 	.ptr.items = NULL
 };
 
+//[ y^5+y^4-11*y^3-17*y^2+9*y+17, -y^4+x*y+11*y^2-x+3*y-13, x^2-y^2+1 ]
+
 extern int _isSameMonomial(unmut Item v1,unmut Item v2);
 extern int _polycmp_LEX(const Item *v1,const Item *v2);
 extern int _polycmp_RLEX(const Item *v1,const Item *v2);
@@ -57,6 +59,9 @@ void polyFree(mut Poly v){
 int isNullPoly(unmut Poly poly){
 	return poly.size == nullPoly.size
 			&& poly.ptr.items == nullPoly.ptr.items;
+}
+int isZeroPoly(unmut Poly poly){
+	return polySize(poly) == 1 && !cmpK(poly.ptr.items[0].coefficient,K_0);
 }
 Poly polyDup(unmut Poly poly){
 	Poly retval = {
@@ -406,9 +411,9 @@ Poly polySim(unmut Poly dividend,unmut Poly divisors){
 	return ret;
 }
 
-#define MAX(x,y,index) (index >= x.size) ? y.degrees[index] : ( \
+#define MAX(x,y,index) ((index >= x.size) ? y.degrees[index] : ( \
 						(index >= y.size) ? x.degrees[index] : (\
-						(x.degrees[index] > y.degrees[index]) ? x.degrees[index] : y.degrees[index]))
+						(x.degrees[index] > y.degrees[index]) ? x.degrees[index] : y.degrees[index])))
 
 Poly polyS(unmut Poly f,unmut Poly g){
 	MonomialOrder order = polyType(f);
@@ -430,8 +435,11 @@ Poly polyS(unmut Poly f,unmut Poly g){
 	w_g.degrees = malloc(sizeof(N)*w_g.size);
 	
 	size_t i;
-	for(i = 0;i < w_f.size;i++){
+	for(i = 0;i < in_f.size;i++){
 		w_f.degrees[i] = MAX(in_f,in_g,i) - in_f.degrees[i];
+	}
+	for(;i < w_f.size;i++){
+		w_f.degrees[i] = MAX(in_f,in_g,i);
 	}
 	for(;i > 0;i--){
 		if(w_f.degrees[i-1]){
@@ -439,8 +447,11 @@ Poly polyS(unmut Poly f,unmut Poly g){
 		}
 	}
 	w_f.size = i;
-	for(i = 0;i < w_g.size;i++){
+	for(i = 0;i < in_g.size;i++){
 		w_g.degrees[i] = MAX(in_f,in_g,i) - in_g.degrees[i];
+	}
+	for(;i < w_g.size;i++){
+		w_g.degrees[i] = MAX(in_f,in_g,i);
 	}
 	for(;i > 0;i--){
 		if(w_g.degrees[i-1]){
@@ -456,7 +467,7 @@ Poly polyS(unmut Poly f,unmut Poly g){
 	setPolyType(w_g_p,order);
 	Poly tmp_f = polyMul(w_f_p,f); polyFree(w_f_p);
 	Poly tmp_g = polyMul(w_g_p,g); polyFree(w_f_p);
-	Poly retval = polyAdd(tmp_f,tmp_g); polyFree(tmp_f);polyFree(tmp_g);
+	Poly retval = polySub(tmp_f,tmp_g); polyFree(tmp_f);polyFree(tmp_g);
 	return retval;
 }
 
@@ -670,19 +681,19 @@ Poly isThisGrobnerBasis(Poly array){
 	Poly reminder;
 	for(i = 0;i < s;i++){
 		for(j = i + 1;j < s;j++){
-			if(_isCoprime(__polyIn(ptr[i]),__polyIn(ptr[j]))){
-				break;
-			}
+			//if(_isCoprime(__polyIn(ptr[i]),__polyIn(ptr[j]))){
+				//continue;
+			//}
 			Poly s_i_j = polyS(ptr[i],ptr[j]);
 			reminder = polySim(s_i_j,array);polyFree(s_i_j);
-			if(polySize(reminder) == 1 && !cmpK(reminder.ptr.items[0].coefficient, K_0)){
+			if(isZeroPoly(reminder)){
 				polyFree(reminder);
 			}else{
 				goto ret;
 			}
 			Poly s_j_i = polyS(ptr[j],ptr[i]);
 			reminder = polySim(s_j_i,array);polyFree(s_j_i);
-			if(polySize(reminder) == 1 && !cmpK(reminder.ptr.items[0].coefficient, K_0)){
+			if(isZeroPoly(reminder)){
 				polyFree(reminder);
 			}else{
 				goto ret;
@@ -705,7 +716,7 @@ Poly GrobnerBasis2ReducedGrobnerBasis(mut Poly grobner){
 	size_t size = polySize(grobner);
 	Poly *ptr = unwrapPolyArray(grobner);
 	for(i = 0;i < size;i++){
-		int64_t j;
+		size_t j;
 		for(j = 0; j < size;j++){
 			if(i == j){
 				continue;
@@ -735,12 +746,21 @@ Poly GrobnerBasis2ReducedGrobnerBasis(mut Poly grobner){
 		for(i = 0;i < size;i++){
 			Poly _divisors = mkPolyArray(&ptr[i+1],size - 1);
 			Poly divisors = removeNullPolyFromArray(polyDup(_divisors));
-			Poly r = polySim(ptr[i],divisors); polyFree(divisors);
-			if(r.size == 1 && !cmpK(r.ptr.items[0].coefficient , K_0)){
+			Poly _result = polyDiv(ptr[i],divisors); polyFree(divisors);
+			Poly *result = unwrapPolyArray(_result);
+			size_t r_index = polySize(_result) - 1;
+			Poly r = result[r_index];
+			if(isZeroPoly(r)){
 				polyFree(r);
 				r = nullPoly;
 			}else{
-				somethingHappened = 1;
+				size_t j;
+				for(j = 0;j < r_index;j++){
+					if(!isZeroPoly(result[j])){
+						somethingHappened = 1;
+						break;
+					}
+				}
 				polyFree(ptr[i]);
 				ptr[i] = nullPoly; 
 			}
@@ -752,28 +772,16 @@ Poly GrobnerBasis2ReducedGrobnerBasis(mut Poly grobner){
 		grobner = removeNullPolyFromArray(grobner);
 	}while(somethingHappened);
 	
-	Poly *newArray = malloc(sizeof(Poly)*size);
-	size_t index = 0;
+	ptr = unwrapPolyArray(grobner);
+	size = polySize(grobner);
 	for(i = 0;i < size;i++){
-		polyFree(ptr[i]);
-		Poly p = ptr[i + size];
-		if(p.size == 1 && !cmpK(p.ptr.items[0].coefficient , K_0)){
-			polyFree(p);
-			continue;
-		}else if(!isNullPoly(p)){
-			size_t j;
-			K gyaku = divK(K_1,p.ptr.items[0].coefficient);
-			for(j = 0;j < polySize(p);j++){
-				p.ptr.items[j].coefficient = mulK(gyaku,p.ptr.items[j].coefficient);
-			}
-			newArray[index++] = p;
+		Poly p = ptr[i];
+		size_t j;
+		K gyaku = divK(K_1,p.ptr.items[0].coefficient);
+		for(j = 0;j < polySize(p);j++){
+			p.ptr.items[j].coefficient = mulK(gyaku,p.ptr.items[j].coefficient);
 		}
 	}
-	free(ptr);
-	if(size != index){
-		size = index;
-		newArray = realloc(newArray,sizeof(Poly) * size);
-	}
-	return mkPolyArray(newArray,size);
+	return grobner;
 }
 
