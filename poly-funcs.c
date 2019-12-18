@@ -31,7 +31,12 @@ const Poly nullPoly = {
 	.ptr.items = NULL
 };
 
-//[ y^5+y^4-11*y^3-17*y^2+9*y+17, -y^4+x*y+11*y^2-x+3*y-13, x^2-y^2+1 ]
+/*
+S.<x,y,z> = PolynomialRing(QQ, 3, order='deglex')
+J = Ideal([x^3 - 3*x^2 - y + 1, -x^2 + y^2 - 1])
+J.groebner_basis()
+
+*/
 
 extern int _isSameMonomial(unmut Item v1,unmut Item v2);
 extern int _polycmp_LEX(const Item *v1,const Item *v2);
@@ -39,7 +44,7 @@ extern int _polycmp_RLEX(const Item *v1,const Item *v2);
 extern int _polycmp_PLEX(const Item *v1,const Item *v2);
 extern Item _copyItem(unmut Item item);
 void polyFree(mut Poly v){
-	return;
+	//return;
 	size_t size = polySize(v);
 	size_t i;
 	if(polyType(v) == ARRAY){
@@ -162,8 +167,7 @@ Poly item2Poly(mut Item item){
 	setPolyType(retval,LEX);
 	retval.ptr.items[0].degrees = item.degrees;
 	retval.ptr.items[0].size = item.size;
-	memcpy(&retval.ptr.items[0].coefficient,&item.coefficient,sizeof(K));
-	//retval.ptr.items[0].coefficient = item.coefficient;
+	retval.ptr.items[0].coefficient = item.coefficient;
 	//memcpy(retval.ptr.items,&item,sizeof(Item));
 	return retval;
 }
@@ -236,7 +240,7 @@ Poly polyAdd(unmut Poly v1,unmut Poly v2){
 	if(index == 0 && someThingDisappeared){
 		index = 1;
 		setPolySize(retval,index);
-		retval.ptr.items = realloc(retval.ptr.items,sizeof(Item)*2);
+		retval.ptr.items = realloc(retval.ptr.items,sizeof(Item));
 		retval.ptr.items[0].degrees = NULL;
 		retval.ptr.items[0].size = 0;
 		retval.ptr.items[0].coefficient = K_0;
@@ -244,8 +248,9 @@ Poly polyAdd(unmut Poly v1,unmut Poly v2){
 		retval.ptr.items = realloc(retval.ptr.items,sizeof(Item)*index);
 		setPolySize(retval,index);
 	}
-	Poly tmp = polySort(retval,polyType(retval));polyFree(retval);
-	return tmp;
+	//Poly tmp = polySort(retval,polyType(retval));polyFree(retval);
+	//return tmp;
+	return retval;
 }
 Poly polySub(unmut Poly v1,unmut Poly v2){
 	int i;
@@ -342,7 +347,7 @@ Poly polyDiv(unmut Poly dividend,unmut Poly divisors){
 	for(i = 0;i < size;i++){
 		setPolySize(retval[i],1);
 		setPolyType(retval[i],order);
-		retval[i].ptr.items = malloc(sizeof(Item)*2);
+		retval[i].ptr.items = malloc(sizeof(Item));
 		memcpy(&retval[i].ptr.items[0].coefficient,&K_0,sizeof(K));
 		retval[i].ptr.items[0].size = 0;
 		retval[i].ptr.items[0].degrees = NULL;	
@@ -381,15 +386,17 @@ Poly polyDiv(unmut Poly dividend,unmut Poly divisors){
 					Poly tmp = item2Poly(w);
 					setPolyType(tmp,order);
 					Poly temp = polyMul(tmp,divisor[i]);
-					//polyPrint(h,stderr);fprintf(stderr,"\n");
 					h = polySort(h,polyType(h));
+					//fprintf(stderr,"h     : ");polyPrint(h,stderr);fprintf(stderr,"\n");
+					//fprintf(stderr,"wf_i  : ");polyPrint(temp,stderr);fprintf(stderr,"\n");
 					Poly tempo = polySub(h,temp);polyFree(temp);polyFree(h);
+					//fprintf(stderr,"h-wf_i: ");polyPrint(tempo,stderr);fprintf(stderr,"\n");fprintf(stderr,"\n");
 					h = tempo;
 					Poly newVal = polyAdd(retval[i],tmp);
 					polyFree(retval[i]);
 					retval[i] = newVal;
 					polyFree(tmp);
-					break;
+					//break;
 					//polyPrint(h,stdout);
 					//printf("\n");
 				}
@@ -398,7 +405,7 @@ Poly polyDiv(unmut Poly dividend,unmut Poly divisors){
 		if(!exists){
 			break;
 		}
-	};
+	}
 	retval[size] = h;
 	return mkPolyArray(retval,size+1);
 }
@@ -411,9 +418,17 @@ Poly polySim(unmut Poly dividend,unmut Poly divisors){
 	return ret;
 }
 
+/*
 #define MAX(x,y,index) ((index >= x.size) ? y.degrees[index] : ( \
 						(index >= y.size) ? x.degrees[index] : (\
 						(x.degrees[index] > y.degrees[index]) ? x.degrees[index] : y.degrees[index])))
+*/						
+					
+N __max(Item x,Item y,size_t index){
+	return ((index >= x.size) ? y.degrees[index] : ( 
+						(index >= y.size) ? x.degrees[index] : (
+						(x.degrees[index] > y.degrees[index]) ? x.degrees[index] : y.degrees[index])));
+}
 
 Poly polyS(unmut Poly f,unmut Poly g){
 	MonomialOrder order = polyType(f);
@@ -421,8 +436,8 @@ Poly polyS(unmut Poly f,unmut Poly g){
 		fprintf(stderr,"S polynomial of different polynomials cannnot be computed\n");
 		DIE;
 	}
-	Item in_f = _polyIn(f);
-	Item in_g = _polyIn(g);
+	Item in_f = __polyIn(f);
+	Item in_g = __polyIn(g);
 	Item w_f = {
 		.size = (in_f.size < in_g.size) ? in_g.size : in_f.size,
 		.coefficient = JOHO_NO_TANIGEN,
@@ -436,10 +451,10 @@ Poly polyS(unmut Poly f,unmut Poly g){
 	
 	size_t i;
 	for(i = 0;i < in_f.size;i++){
-		w_f.degrees[i] = MAX(in_f,in_g,i) - in_f.degrees[i];
+		w_f.degrees[i] = __max(in_f,in_g,i) - in_f.degrees[i];
 	}
 	for(;i < w_f.size;i++){
-		w_f.degrees[i] = MAX(in_f,in_g,i);
+		w_f.degrees[i] = __max(in_f,in_g,i);
 	}
 	for(;i > 0;i--){
 		if(w_f.degrees[i-1]){
@@ -448,10 +463,10 @@ Poly polyS(unmut Poly f,unmut Poly g){
 	}
 	w_f.size = i;
 	for(i = 0;i < in_g.size;i++){
-		w_g.degrees[i] = MAX(in_f,in_g,i) - in_g.degrees[i];
+		w_g.degrees[i] = __max(in_f,in_g,i) - in_g.degrees[i];
 	}
 	for(;i < w_g.size;i++){
-		w_g.degrees[i] = MAX(in_f,in_g,i);
+		w_g.degrees[i] = __max(in_f,in_g,i);
 	}
 	for(;i > 0;i--){
 		if(w_g.degrees[i-1]){
@@ -483,14 +498,6 @@ Item _copyItem(unmut Item item){
 		retval.degrees = NULL;
 	}
 	return retval; 
-}
-
-Poly appendItem2Poly(mut Poly poly,mut Item item){
-	size_t newSize = polySize(poly) + 1 ; // setPolySize is macro. To make it work as we want, this line is necessary
-	setPolySize(poly, newSize );
-	poly.ptr.items = realloc(poly.ptr.items,sizeof(Item)*newSize);
-	poly.ptr.items[newSize - 1] = item;
-	return poly;
 }
 
 int _polycmp_LEX(const Item *v1,const Item *v2){
@@ -681,9 +688,9 @@ Poly isThisGrobnerBasis(Poly array){
 	Poly reminder;
 	for(i = 0;i < s;i++){
 		for(j = i + 1;j < s;j++){
-			//if(_isCoprime(__polyIn(ptr[i]),__polyIn(ptr[j]))){
-				//continue;
-			//}
+			if(_isCoprime(__polyIn(ptr[i]),__polyIn(ptr[j]))){
+				continue;
+			}
 			Poly s_i_j = polyS(ptr[i],ptr[j]);
 			reminder = polySim(s_i_j,array);polyFree(s_i_j);
 			if(isZeroPoly(reminder)){

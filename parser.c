@@ -252,14 +252,13 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 		now = now->next;
 	}
 	if(s > 0){
-		s++;
-		if(s != capacity){
-			capacity = s;
+		if(s + 1 != capacity){
+			capacity = s + 1;
 			ptr = realloc(ptr,sizeof(Poly) * capacity);
 		}
-		ptr[s - 1] = _parser(head,now,blackboard);
-		if(isNullPoly(ptr[s-1])){
-			s--;
+		ptr[s] = _parser(head,now,blackboard);
+		if(!isNullPoly(ptr[s])){
+			s++;
 		}
 		return mkPolyArray(ptr,s);
 	}else{
@@ -277,7 +276,6 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 						retval = polyAdd(pLeft,pRight);
 					}else{
 						return pRight;
-						
 					}
 					polyFree(pLeft);
 					polyFree(pRight);
@@ -314,7 +312,7 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 	}
 	
 	Poly retval = {
-		.ptr.items = malloc(sizeof(Item)*2) 
+		.ptr.items = malloc(sizeof(Item)) 
 		//For some reason, when I pass sizeof(Item) to malloc, allocated space get over written.
 		//This must be a bug of compiler!!!!!!! Not my fault!
 	};
@@ -346,8 +344,7 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 							.degrees = NULL
 						};
 						Poly mulDis = item2Poly(w);
-						Poly tmp = polyMul(retval,mulDis);polyFree(mulDis);
-						polyFree(retval);
+						Poly tmp = polyMul(retval,mulDis);polyFree(mulDis);	polyFree(retval);
 						retval = tmp;
 					}else{
 						DIE;

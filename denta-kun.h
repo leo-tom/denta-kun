@@ -166,6 +166,7 @@ Poly polyDiv(unmut Poly dividend,unmut Poly divisor);
 Poly polySim(unmut Poly dividend,unmut Poly divisors);
 Poly polyS(unmut Poly f,unmut Poly g);
 
+int isZeroPoly(unmut Poly poly);
 Item __polyIn(unmut Poly poly);
 Item _polyIn(unmut Poly poly);
 Poly polyIn(unmut Poly poly);

@@ -86,7 +86,7 @@ Poly builtIn_BBA(Poly array,BlackBoard blackboard){
 		r = isThisGrobnerBasis(array);
 		polyPrint(array,stdout);
 		printf("is ");
-		if(r.size == 1 && !cmpK(r.ptr.items[0].coefficient,K_0)){
+		if(isZeroPoly(r)){
 			printf("Grobner basis.\n ");
 			polyFree(r);
 			break;
