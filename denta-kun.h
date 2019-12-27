@@ -32,6 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
+#include <unistd.h>
 
 #define mut
 #define unmut
@@ -88,10 +89,12 @@ typedef struct{
 #define MONOMIAL_ORDER_IN_BIN__PLEX (2)
 #define MONOMIAL_ORDER_IN_BIN__ARRAY (3)
 
+
 #define polySize(p) (p.size & 0xfffffffffffffff)
 #define polyType(p) ((p.size >> 60) == MONOMIAL_ORDER_IN_BIN__RLEX ? RLEX : \
 					 ((p.size >> 60) == MONOMIAL_ORDER_IN_BIN__PLEX ? PLEX : ( \
 					  (p.size >> 60) == MONOMIAL_ORDER_IN_BIN__LEX ? LEX : ARRAY)))
+
 #define setPolySize(p,newSize) do{ p.size &= ((int64_t)0xf) << 60;p.size |= (0xfffffffffffffff & (newSize));}while(0)
 #define setPolyType(p,t) do{p.size &= 0xfffffffffffffff; \
 							if( t == RLEX ){ \
@@ -167,6 +170,7 @@ Poly polySim(unmut Poly dividend,unmut Poly divisors);
 Poly polyS(unmut Poly f,unmut Poly g);
 
 int isZeroPoly(unmut Poly poly);
+N polyDegrees(unmut Poly p);
 Item __polyIn(unmut Poly poly);
 Item _polyIn(unmut Poly poly);
 Poly polyIn(unmut Poly poly);

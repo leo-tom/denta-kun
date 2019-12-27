@@ -29,10 +29,33 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 FILE *OUTFILE = NULL;
 
+const char PRE_INCLUDE[] = "LEX = 0 \\\\ RLEX = 1 \\\\ PLEX = 2\\\\";
+
+BlackBoard readPreInclude(BlackBoard blackboard){
+	int fds[2];
+	if(pipe(fds)){
+		DIE;
+	}
+	int rfd = fds[0];
+	int wfd = fds[1];
+	write(wfd,PRE_INCLUDE,strlen(PRE_INCLUDE));
+	close(wfd);
+	FILE *fp = fdopen(rfd,"r");
+	Definition definition = parser(fp,blackboard);
+	while(!feof(fp)){
+		if(strlen(getNameFromDefinition(&definition)) == 0){
+			DIE;
+		}
+		blackboard = insert2BlackBoard(blackboard,definition);
+		definition = parser(fp,blackboard);
+	}
+	return sortBlackBoard(blackboard);
+}
+
 int main(int argc,char *argv[]){
 	OUTFILE = stdout;
 	FILE *infile = stdin;
-	BlackBoard blackboard = mkBlackBoard();
+	BlackBoard blackboard = readPreInclude(mkBlackBoard());
 	Definition definition = parser(infile,blackboard);
 	unsigned int anonIndex = 0;
 	char buff[128];

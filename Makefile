@@ -1,5 +1,6 @@
 #options = -02 -Wall
-options = -g -ggdb -Wall -DDEBUG=1
+DEBUG ?= 0
+options = -g -ggdb -Wall -DDEBUG=$(DEBUG)
 objs = main.o parser.o poly-funcs.o black-board.o builtin-funcs.o K.o
 headers = denta-kun.h
 CC = gcc

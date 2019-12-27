@@ -78,32 +78,38 @@ Poly builtIn_SP(Poly arg,BlackBoard blackboard){
 	return retval;
 }
 
-Poly builtIn_BBA(Poly array,BlackBoard blackboard){
+Poly builtIn_BBA(volatile Poly array,BlackBoard blackboard){
 	Poly r;
 	size_t capacity = polySize(array);
 	size_t i = polySize(array);
 	do{
 		r = isThisGrobnerBasis(array);
+		#if DEBUG == 1
 		polyPrint(array,stdout);
 		printf("is ");
-		if(isZeroPoly(r)){
+		#endif
+		if(isZeroPoly(r) || polyDegrees(r) == 0){
+			#if DEBUG == 1
 			printf("Grobner basis.\n ");
+			#endif
 			polyFree(r);
 			break;
 		}
+		#if DEBUG == 1
 		printf("not Grobner basis because : \n");
 		polyPrint(r,stdout);
 		printf("is not empty.\n");
+		#endif
 		if(i >= capacity){
 			capacity *= 2;
-			array.ptr.polies = realloc(array.ptr.polies,capacity * sizeof(Poly));
+			array.ptr.polies = realloc(array.ptr.polies,capacity * sizeof(array.ptr.polies[0]));
 		}
 		array.ptr.polies[i] = r;
 		i++;
 		setPolySize(array,i);
 	}while(1);
 	if(i < capacity){
-		array.ptr.polies = realloc(array.ptr.polies,i * sizeof(Poly));
+		array.ptr.polies = realloc(array.ptr.polies,i * sizeof(array.ptr.polies[0]));
 	}
 	setPolySize(array,i);
 	return GrobnerBasis2ReducedGrobnerBasis(array);
@@ -114,10 +120,48 @@ Poly builtIn_SIM(Poly arg,BlackBoard blackboard){
 	}
 	Poly *array = unwrapPolyArray(arg);
 	Poly divisors = mkPolyArray(&array[1],polySize(arg) - 1 );
-	Poly result = polySim(array[0],divisors); polyFree(arg);
+	Poly result = polySim(array[0],divisors);
+	polyFree(arg);
 	return result;
 }
-const size_t BUILT_IN_FUNC_SIZE = 6;
+Poly builtIn_SRT(Poly arg,BlackBoard blackboard){
+	if(polyType(arg) != ARRAY){
+		DIE;
+	}
+	Poly *array = unwrapPolyArray(arg);
+	int64_t type = poly2Double(*array) + 0.5;
+	MonomialOrder order;
+	switch (type) {
+		case MONOMIAL_ORDER_IN_BIN__LEX: {order = LEX;break;}
+		case MONOMIAL_ORDER_IN_BIN__RLEX: {order = RLEX;break;}
+		case MONOMIAL_ORDER_IN_BIN__PLEX: {order = PLEX;break;}
+		default :{
+			fprintf(stderr,"Unknown type \"%ld\"\n",type);
+			DIE;
+		}
+	}
+	size_t i;
+	size_t size = polySize(arg);
+	size--;
+	array++;
+	Poly *ptr = malloc(size * sizeof(Poly));
+	for(i = 0;i < size;i++){
+		Poly p = array[i];
+		ptr[i] = polySort(p,order);
+	}
+	Poly retval = nullPoly;
+	if(size == 1){
+		retval = ptr[0];
+		free(ptr);
+	}else if (size > 1){
+		retval = mkPolyArray(ptr,size);
+	}
+	polyFree(arg);
+	return retval;
+}
+
+//ABCDEFGHIJKLMNOPQRSTUVWXYZ
+const size_t BUILT_IN_FUNC_SIZE = 7;
 const Function BUILT_IN_FUNCS[] = {
 	{
 		.name = "BBA",
@@ -143,6 +187,11 @@ const Function BUILT_IN_FUNCS[] = {
 		.name = "SIM",
 		.description = "Calculate simplified polynomial",
 		.funcptr = builtIn_SIM
+	},
+	{
+		.name = "SRT",
+		.description = "Sort polynomial by specified monomial order",
+		.funcptr = builtIn_SRT
 	},
 	{
 		.name = "SSN",

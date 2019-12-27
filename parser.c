@@ -170,7 +170,7 @@ Node * __parser(FILE *stream){
 					}
 					
 					{
-						char _buff[256];
+						char _buff[256] = {0};
 						char *buff = _buff;
 						*buff++ = c;
 						while(isalpha(c = fgetc(stream)) || c == '_' || isdigit(c) || c == '{' || c == '}'){
@@ -450,6 +450,7 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 					polyFree(mulDis);
 					retval = tmp;
 				}else{
+					blackboard = sortBlackBoard(blackboard);
 					Poly mulDis = findFromBlackBoard(blackboard,now->str,strlen(now->str));
 					if(isNullPoly(mulDis) ) {fprintf(stderr,"Variable %s undefined.\n",now->str);DIE;}
 					if(polyType(mulDis) == ARRAY){

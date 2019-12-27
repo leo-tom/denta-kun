@@ -1,10 +1,22 @@
-Denta-kun is an application that calculates Grobner bases from given generators.
-It takes tex-like input, and outputs tex-like text expressing a grobner base of it.
+Denta-kun is an application that calculates Groebner bases from given generators.
+It takes tex-like input, and outputs tex-like text expressing a Groebner base of it.
 
 To compile it, just execute make without any options. It is still in development. Therefore,
 it may not even compile.
 
-This program is written for the class 'Seminar 1' of Department of Computer Science, Chiba Institude of Technology.
+To run it, give commands to a generated binary. For instance, execute following command to 
+calculate Groebner basis. Make sure you remove '$' when you type following commands.
+####################################
+$echo 'f_1 = x^3 - 3x^2-x_1 + 1 \\
+f_2 = x_1^2 - x^2  - 1 \\
+I = f_1,f_2 \\
+I = \SRT(PLEX,I) \\
+G = \BBA(I) \\
+\PP(G)\\' > input.txt
+$./dentakun < input.txt
+####################################
+
+This program is written for the lecture 'Seminar 1' of Department of Computer Science, Chiba Institude of Technology.
 
 To contact the one who wrote this program, you can send e-mail to s1731108gt@s.chibakoudai.jp or 
 send message to a Twitter account @Charcoal_gone. It is possible that the e-mail adress I mentioned
