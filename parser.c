@@ -316,7 +316,8 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 		//For some reason, when I pass sizeof(Item) to malloc, allocated space get over written.
 		//This must be a bug of compiler!!!!!!! Not my fault!
 	};
-	retval.ptr.items[0].coefficient = K_1;
+	initK(retval.ptr.items[0].coefficient);
+	copyK(retval.ptr.items[0].coefficient , K_1);
 	retval.ptr.items[0].degrees = NULL;
 	retval.ptr.items[0].size = 0;
 	setPolySize(retval,1);
@@ -340,9 +341,10 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 					if(bunbo.size == 1 && bunsi.size == 1 && bunbo.ptr.items[0].size == 0 && bunsi.ptr.items[0].size == 0){
 						Item w = {
 							.size = 0,
-							.coefficient = divK(bunsi.ptr.items[0].coefficient,bunbo.ptr.items[0].coefficient),
 							.degrees = NULL
 						};
+						initK(w.coefficient);
+						divK(w.coefficient,bunsi.ptr.items[0].coefficient,bunbo.ptr.items[0].coefficient);
 						Poly mulDis = item2Poly(w);
 						Poly tmp = polyMul(retval,mulDis);polyFree(mulDis);	polyFree(retval);
 						retval = tmp;
@@ -381,10 +383,12 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 				break;
 			}
 			case Number:{
-				K val = str2K(now->str);
+				K val;
+				initK(val);
+				str2K(val,now->str);
 				int i = 0;
 				for(i = 0;i < polySize(retval);i++){
-					retval.ptr.items[i].coefficient = mulK(retval.ptr.items[i].coefficient,val);
+					mulK(retval.ptr.items[i].coefficient,retval.ptr.items[i].coefficient,val);
 				}
 				now = now->next;
 				break;
@@ -433,9 +437,9 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 					}
 					Item item = {
 						.size = (index + 1),
-						.degrees = calloc(index + 1,sizeof(N)),
-						.coefficient = JOHO_NO_TANIGEN
+						.degrees = calloc(index + 1,sizeof(N))
 					};
+					copyK(item.coefficient,K_1);
 					item.degrees[index] = degrees;
 					
 					Poly mulDis = {

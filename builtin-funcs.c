@@ -78,7 +78,7 @@ Poly builtIn_SP(Poly arg,BlackBoard blackboard){
 	return retval;
 }
 
-Poly builtIn_BBA(volatile Poly array,BlackBoard blackboard){
+Poly builtIn_BBA(Poly array,BlackBoard blackboard){
 	Poly r;
 	size_t capacity = polySize(array);
 	size_t i = polySize(array);
@@ -93,6 +93,7 @@ Poly builtIn_BBA(volatile Poly array,BlackBoard blackboard){
 			printf("Grobner basis.\n ");
 			#endif
 			polyFree(r);
+			fprintf(stderr,"YEY! I found Grobner basis\n");
 			break;
 		}
 		#if DEBUG == 1
@@ -100,9 +101,10 @@ Poly builtIn_BBA(volatile Poly array,BlackBoard blackboard){
 		polyPrint(r,stdout);
 		printf("is not empty.\n");
 		#endif
+		fprintf(stderr,"Nope\n");
 		if(i >= capacity){
 			capacity *= 2;
-			array.ptr.polies = realloc(array.ptr.polies,capacity * sizeof(array.ptr.polies[0]));
+			array.ptr.polies = realloc(array.ptr.polies,capacity * sizeof(Poly));
 		}
 		array.ptr.polies[i] = r;
 		i++;

@@ -44,8 +44,25 @@ extern int _polycmp_RLEX(const Item *v1,const Item *v2);
 extern int _polycmp_PLEX(const Item *v1,const Item *v2);
 extern Item _copyItem(unmut Item item);
 
+void _setPolySize(Poly *poly,size_t size){
+	poly->size &= ((int64_t)0xf) << 60;
+	poly->size |= (0xfffffffffffffff & size);
+}
+void _setPolyType(Poly *poly,MonomialOrder order){
+	poly->size &= 0xfffffffffffffff;
+	if( order == RLEX ){
+		poly->size |= (int64_t)MONOMIAL_ORDER_IN_BIN__RLEX << 60 ;
+	}else if(order == PLEX){
+		poly->size |= (int64_t)MONOMIAL_ORDER_IN_BIN__PLEX << 60;
+	}else if(order == ARRAY){ 
+		poly->size |= (int64_t)MONOMIAL_ORDER_IN_BIN__ARRAY << 60;
+	}else{
+		poly->size |= (int64_t)MONOMIAL_ORDER_IN_BIN__LEX << 60;
+	}
+}
+
 void polyFree(mut Poly v){
-	return;
+	//return;
 	size_t size = polySize(v);
 	size_t i;
 	if(polyType(v) == ARRAY){
@@ -56,6 +73,7 @@ void polyFree(mut Poly v){
 	}else{
 		for(i=0;i < size;i++){
 			free(v.ptr.items[i].degrees);
+			freeK(v.ptr.items[i].coefficient);
 		}
 	}
 	if(size > 0){
@@ -96,7 +114,7 @@ Poly polyDup(unmut Poly poly){
 			to[i] = polyDup(from[i]);
 		}
 	}else{
-		retval.ptr.items = malloc(sizeof(retval.ptr.items[0])*polySize(poly));
+		retval.ptr.items = malloc(sizeof(Item)*polySize(poly));
 		size_t i;
 		for(i = 0;i < polySize(poly);i++){
 			retval.ptr.items[i] = _copyItem(poly.ptr.items[i]);
@@ -161,7 +179,9 @@ void polyPrint(unmut Poly poly,FILE *fp){
 				first = 0;
 				fprintf(fp,"%s ",K2str(item.coefficient,buff));
 			}else if(cmpK(item.coefficient,JOHO_NO_TANIGEN) < 0){
-				K tmp = mulK(K_N1,item.coefficient);
+				K tmp;
+				initK(tmp);
+				mulK(tmp,K_N1,item.coefficient);
 				fprintf(fp," - %s ",K2str(tmp,buff));
 			}else{
 				fprintf(fp," + %s ",K2str(item.coefficient,buff));
@@ -183,7 +203,8 @@ Poly item2Poly(mut Item item){
 	setPolyType(retval,LEX);
 	retval.ptr.items->degrees = item.degrees;
 	retval.ptr.items->size = item.size;
-	retval.ptr.items->coefficient = item.coefficient;
+	initK(retval.ptr.items->coefficient);
+	copyK(retval.ptr.items->coefficient, item.coefficient);
 	return retval;
 }
 Item __polyIn(unmut Poly poly){
@@ -241,7 +262,8 @@ Poly polyAdd(unmut Poly v1,unmut Poly v2){
 			retval.ptr.items[index++] = _copyItem(v2.ptr.items[j++]);
 		}else{
 			retval.ptr.items[index] = _copyItem(v1.ptr.items[i++]);
-			retval.ptr.items[index].coefficient = addK(retval.ptr.items[index].coefficient
+			addK(retval.ptr.items[index].coefficient,
+					retval.ptr.items[index].coefficient
 														, v2.ptr.items[j++].coefficient);
 			if(!cmpK(retval.ptr.items[index].coefficient,K_0)){
 				someThingDisappeared = 1;
@@ -256,24 +278,24 @@ Poly polyAdd(unmut Poly v1,unmut Poly v2){
 		retval.ptr.items = realloc(retval.ptr.items,sizeof(Item));
 		retval.ptr.items[0].degrees = NULL;
 		retval.ptr.items[0].size = 0;
-		retval.ptr.items[0].coefficient = K_0;
+		copyK(retval.ptr.items[0].coefficient,K_0);
 		setPolySize(retval,1);
 	}else if(index < polySize(retval)){
 		retval.ptr.items = realloc(retval.ptr.items,sizeof(Item)*index);
 		setPolySize(retval,index);
 	}
-	return retval;
-	//Poly tmp = polySort(retval,polyType(retval));polyFree(retval);
-	//return tmp;
+	//return retval;
+	Poly tmp = polySort(retval,polyType(retval));polyFree(retval);
+	return tmp;
 }
 Poly polySub(unmut Poly v1,unmut Poly v2){
 	int i;
 	for(i = 0;i < polySize(v2);i++){
-		v2.ptr.items[i].coefficient = mulK(v2.ptr.items[i].coefficient,K_N1);
+		mulK(v2.ptr.items[i].coefficient,v2.ptr.items[i].coefficient,K_N1);
 	}
 	Poly retval = polyAdd(v1,v2);
 	for(i = 0;i < polySize(v2);i++){
-		v2.ptr.items[i].coefficient = mulK(v2.ptr.items[i].coefficient,K_N1);
+		mulK(v2.ptr.items[i].coefficient,v2.ptr.items[i].coefficient,K_N1);
 	}
 	return retval;
 }
@@ -303,13 +325,13 @@ Poly polyMul(unmut Poly v1,unmut Poly v2){
 				for(k = 0;k < v2.ptr.items[j].size ;k++){
 					retval.ptr.items[index].degrees[k] += v2.ptr.items[j].degrees[k];
 				}
-				retval.ptr.items[index].coefficient = mulK(retval.ptr.items[index].coefficient, v2.ptr.items[j].coefficient);
+				mulK(retval.ptr.items[index].coefficient,retval.ptr.items[index].coefficient, v2.ptr.items[j].coefficient);
 			}else{
 				retval.ptr.items[index] = _copyItem(v2.ptr.items[j]);
 				for(k = 0;k < v1.ptr.items[i].size ;k++){
 					retval.ptr.items[index].degrees[k] += v1.ptr.items[i].degrees[k];
 				}
-				retval.ptr.items[index].coefficient = mulK(retval.ptr.items[index].coefficient, v1.ptr.items[i].coefficient);
+				mulK(retval.ptr.items[index].coefficient,retval.ptr.items[index].coefficient, v1.ptr.items[i].coefficient);
 			}
 			index++;			
 		}
@@ -357,10 +379,10 @@ Poly polyDiv(unmut Poly dividend,unmut Poly divisors){
 	for(i = 0;i < size;i++){
 		in_g[i] = __polyIn(divisor[i]);
 	}
-	Poly *retval = malloc(sizeof(*retval)*(size + 1));
+	Poly *retval = malloc(sizeof(Poly) * (size + 1));
 	for(i = 0;i < size;i++){
 		Item *ptr = malloc(sizeof(Item));
-		ptr->coefficient = K_0;
+		copyK(ptr->coefficient,K_0);
 		ptr->size = 0;
 		ptr->degrees = NULL;
 		retval[i].ptr.items = ptr;
@@ -376,13 +398,12 @@ Poly polyDiv(unmut Poly dividend,unmut Poly divisors){
 					exists = 1;
 					unmut Item u = h.ptr.items[j];
 					unmut Item g = in_g[i];
-					K c_gi = g.coefficient;
-					K c_f = u.coefficient;
 					Item w = {
 						.size = u.size,
-						.degrees = malloc(sizeof(N)*u.size),
-						.coefficient = divK(c_f , c_gi)
+						.degrees = malloc(sizeof(N)*u.size)
 					};
+					initK(w.coefficient);
+					divK(w.coefficient,u.coefficient , g.coefficient);
 					for(k = 0;k < g.size;k++){
 						w.degrees[k] = u.degrees[k] - g.degrees[k];
 					}
@@ -413,7 +434,7 @@ Poly polyDiv(unmut Poly dividend,unmut Poly divisors){
 					polyFree(retval[i]);
 					retval[i] = newVal;
 					polyFree(tmp);
-					//break;
+					break;
 				}
 			}
 		}
@@ -434,6 +455,9 @@ Poly polySim(unmut Poly dividend,unmut Poly divisors){
 }					
 					
 N __max(Item x,Item y,size_t index){
+	if(index >= x.size && index >= y.size){
+		DIE;
+	}
 	if(index >= x.size){
 		return y.degrees[index];
 	}else if(index >= y.size){
@@ -455,14 +479,14 @@ Poly polyS(unmut Poly f,unmut Poly g){
 	Item in_g = __polyIn(g);
 	Item w_f = {
 		.size = (in_f.size < in_g.size) ? in_g.size : in_f.size,
-		.coefficient = JOHO_NO_TANIGEN,
 	};
 	Item w_g = {
 		.size = (in_f.size < in_g.size) ? in_g.size : in_f.size,
-		.coefficient = JOHO_NO_TANIGEN
 	};
-	w_g.degrees = malloc(sizeof(w_g.degrees[0])*w_g.size);
-	w_f.degrees = malloc(sizeof(w_f.degrees[0])*w_f.size);
+	w_g.degrees = malloc(sizeof(N)*w_g.size);
+	w_f.degrees = malloc(sizeof(N)*w_f.size);
+	initK(w_f.coefficient);
+	initK(w_g.coefficient);
 	size_t i;
 	for(i = 0;i < in_f.size;i++){
 		w_f.degrees[i] = __max(in_f,in_g,i) - in_f.degrees[i];
@@ -488,23 +512,23 @@ Poly polyS(unmut Poly f,unmut Poly g){
 		}
 	}
 	w_g.size = i;
-	w_f.coefficient = divK(K_1,in_f.coefficient);
-	w_g.coefficient = divK(K_1,in_g.coefficient);
+	divK(w_f.coefficient,K_1,in_f.coefficient);
+	divK(w_g.coefficient,K_1,in_g.coefficient);
 	Poly w_f_p = item2Poly(w_f);
 	Poly w_g_p = item2Poly(w_g);
 	setPolyType(w_f_p,order);
 	setPolyType(w_g_p,order);
 	Poly tmp_f = polyMul(w_f_p,f); polyFree(w_f_p);
-	Poly tmp_g = polyMul(w_g_p,g); polyFree(w_f_p);
+	Poly tmp_g = polyMul(w_g_p,g); polyFree(w_g_p);
 	Poly retval = polySub(tmp_f,tmp_g); polyFree(tmp_f);polyFree(tmp_g);
 	return retval;
 }
 
 Item _copyItem(unmut Item item){
 	Item retval = {
-		.size = item.size,
-		.coefficient = item.coefficient
+		.size = item.size
 	};
+	copyK(retval.coefficient,item.coefficient);
 	if(item.size){
 		retval.degrees = malloc(item.size * sizeof(N));
 		memcpy(retval.degrees,item.degrees,item.size * sizeof(N));
@@ -636,7 +660,8 @@ Poly polySort(unmut Poly poly,MonomialOrder order){
 	for(i = 0;i < size;i++){
 		retval.ptr.items[index] = toBeSorted.ptr.items[i];
 		for(j = i + 1;j < size && _isSameMonomial(toBeSorted.ptr.items[i],toBeSorted.ptr.items[j]);j++){
-			retval.ptr.items[index].coefficient = addK(retval.ptr.items[index].coefficient, toBeSorted.ptr.items[j].coefficient);
+			addK(retval.ptr.items[index].coefficient,
+				retval.ptr.items[index].coefficient, toBeSorted.ptr.items[j].coefficient);
 			free(toBeSorted.ptr.items[j].degrees);
 		}
 		if(!cmpK(retval.ptr.items[index].coefficient , K_0)){
@@ -652,7 +677,7 @@ Poly polySort(unmut Poly poly,MonomialOrder order){
 		retval.ptr.items = realloc(retval.ptr.items,sizeof(*(retval.ptr.items)));
 		retval.ptr.items[0].degrees = NULL;
 		retval.ptr.items[0].size = 0;
-		retval.ptr.items[0].coefficient = K_0;
+		copyK(retval.ptr.items[0].coefficient,K_0);
 		setPolySize(retval,index);
 	}else if(polySize(retval) != index){
 		retval.ptr.items = realloc(retval.ptr.items,sizeof(*(retval.ptr.items))*(index+1));
@@ -688,7 +713,7 @@ Poly removeNullPolyFromArray(mut Poly poly){
 	size_t i;
 	size_t size = polySize(poly);
 	Poly *ptr = unwrapPolyArray(poly);
-	Poly *newPtr = malloc(sizeof(*newPtr)*size);
+	Poly *newPtr = malloc(sizeof(Poly)*size);
 	size_t index = 0;
 	for(i = 0;i < size;i++){
 		if(!isNullPoly(ptr[i])){
@@ -734,9 +759,9 @@ Poly isThisGrobnerBasis(Poly array){
 	}
 	Item item = {
 		.size = 1,
-		.coefficient = K_0,
 		.degrees = NULL
 	};
+	copyK(item.coefficient,K_0);
 	reminder = item2Poly(item);
 	MonomialOrder order = polyType(ptr[0]);
 	setPolyType(reminder,order);
@@ -762,9 +787,12 @@ Poly GrobnerBasis2ReducedGrobnerBasis(mut Poly grobner){
 			}
 		}
 		if(!isNullPoly(ptr[i])){
-			K gyaku = divK(K_1,ptr[i].ptr.items[0].coefficient);
+			K gyaku;
+			initK(gyaku);
+			divK(gyaku,K_1,ptr[i].ptr.items[0].coefficient);
 			for(j = 0;j < polySize(ptr[i]);j++){
-				ptr[i].ptr.items[j].coefficient = mulK(gyaku,ptr[i].ptr.items[j].coefficient);
+				mulK(ptr[i].ptr.items[j].coefficient,
+					gyaku,ptr[i].ptr.items[j].coefficient);
 			}
 		}
 	}
@@ -810,9 +838,12 @@ Poly GrobnerBasis2ReducedGrobnerBasis(mut Poly grobner){
 	for(i = 0;i < size;i++){
 		Poly p = ptr[i];
 		size_t j;
-		K gyaku = divK(K_1,p.ptr.items[0].coefficient);
+		K gyaku;
+		initK(gyaku);
+		divK(gyaku,K_1,p.ptr.items[0].coefficient);
 		for(j = 0;j < polySize(p);j++){
-			p.ptr.items[j].coefficient = mulK(gyaku,p.ptr.items[j].coefficient);
+			mulK(p.ptr.items[j].coefficient,
+			gyaku,p.ptr.items[j].coefficient);
 		}
 	}
 	return grobner;

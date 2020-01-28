@@ -34,6 +34,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <string.h>
 #include <unistd.h>
 
+#include <gmp.h>
+
 #define mut
 #define unmut
 
@@ -41,10 +43,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 extern FILE *OUTFILE;
 
+/*
+typedef __int128_t Qint;
+
 typedef struct {
-	int64_t numerator;
-    int64_t denominator;
+	Qint numerator;
+	Qint denominator;
 }Q;
+*/
+typedef mpq_t Q; 
 
 typedef Q Numeric;
 //typedef uint64_t Natural;
@@ -52,24 +59,30 @@ typedef int64_t Natural;
 
 typedef Numeric K;
 typedef Natural N;
-
+extern K JOHO_NO_TANIGEN; //1
+extern K KAHO_NO_TANIGEN; //0
+extern K JOHO_NO_TANIGEN_NO_KAHO_NO_GYAKUGEN; //-1
+void initConst();
+/*
 extern const K JOHO_NO_TANIGEN; //1
 extern const K KAHO_NO_TANIGEN; //0
 extern const K JOHO_NO_TANIGEN_NO_KAHO_NO_GYAKUGEN; //-1
-
+*/
 #define K_1 JOHO_NO_TANIGEN
 #define K_0 KAHO_NO_TANIGEN 
 #define K_N1 JOHO_NO_TANIGEN_NO_KAHO_NO_GYAKUGEN
 
 int cmpK(const K v1,const K v2);
-K str2K(const char *str);
+void str2K(K val,const char *str);
 char * K2str(const K k,char *buff);
 double K2double(const K k);
-K addK(const K v1,const K v2);
-K subK(const K v1,const K v2);
-K mulK(const K v1,const K v2);
-K divK(const K v1,const K v2);
-
+void addK(K val,const K v1,const K v2);
+void subK(K val,const K v1,const K v2);
+void mulK(K val,const K v1,const K v2);
+void divK(K val,const K v1,const K v2);
+void freeK(K k);
+void copyK(K to,const K from);
+void initK(K k);
 
 typedef enum _MonomialOrder{
 	LEX,
@@ -84,28 +97,6 @@ typedef struct{
 	N *degrees;
 }Item;
 
-#define MONOMIAL_ORDER_IN_BIN__LEX (0)
-#define MONOMIAL_ORDER_IN_BIN__RLEX (1)
-#define MONOMIAL_ORDER_IN_BIN__PLEX (2)
-#define MONOMIAL_ORDER_IN_BIN__ARRAY (3)
-
-
-#define polySize(p) (p.size & 0xfffffffffffffff)
-#define polyType(p) ((p.size >> 60) == MONOMIAL_ORDER_IN_BIN__RLEX ? RLEX : \
-					 ((p.size >> 60) == MONOMIAL_ORDER_IN_BIN__PLEX ? PLEX : ( \
-					  (p.size >> 60) == MONOMIAL_ORDER_IN_BIN__LEX ? LEX : ARRAY)))
-
-#define setPolySize(p,newSize) do{ p.size &= ((int64_t)0xf) << 60;p.size |= (0xfffffffffffffff & (newSize));}while(0)
-#define setPolyType(p,t) do{p.size &= 0xfffffffffffffff; \
-							if( t == RLEX ){ \
-							 p.size |= (int64_t)MONOMIAL_ORDER_IN_BIN__RLEX << 60 ;\
-							}else if(t == PLEX){\
-							 p.size |= (int64_t)MONOMIAL_ORDER_IN_BIN__PLEX << 60;\
-							}else if(t == ARRAY){ \
-							 p.size |= (int64_t)MONOMIAL_ORDER_IN_BIN__ARRAY << 60;\
-							}else{\
-							 p.size |= (int64_t)MONOMIAL_ORDER_IN_BIN__LEX << 60;}}while(0)
-
 typedef struct __Poly__{
 	/*Assume size_t is 64 bit long. If not, this is not gonna work.*/
 	/*lower 60 bits are used to store size of an array *items*/
@@ -116,6 +107,23 @@ typedef struct __Poly__{
 		struct __Poly__ *polies;
 	}ptr;
 }Poly;
+
+#define MONOMIAL_ORDER_IN_BIN__LEX (0)
+#define MONOMIAL_ORDER_IN_BIN__RLEX (1)
+#define MONOMIAL_ORDER_IN_BIN__PLEX (2)
+#define MONOMIAL_ORDER_IN_BIN__ARRAY (3)
+
+void _setPolySize(Poly *poly,size_t size);
+void _setPolyType(Poly *poly,MonomialOrder);
+
+#define polySize(p) (p.size & 0xfffffffffffffff)
+#define polyType(p) ((p.size >> 60) == MONOMIAL_ORDER_IN_BIN__RLEX ? RLEX : \
+					 ((p.size >> 60) == MONOMIAL_ORDER_IN_BIN__PLEX ? PLEX : ( \
+					  (p.size >> 60) == MONOMIAL_ORDER_IN_BIN__LEX ? LEX : ARRAY)))
+
+#define setPolySize(polynomial,newSize) _setPolySize(&polynomial,newSize)
+#define setPolyType(polynomial,typeToBeSet) _setPolyType(&polynomial,typeToBeSet)
+
 
 #define DEFINITION_BYTES_SIZE (16)
 

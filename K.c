@@ -26,6 +26,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "denta-kun.h"
 
+/*
 const K JOHO_NO_TANIGEN = {
 	.numerator = 1,
 	.denominator = 1
@@ -39,201 +40,100 @@ const K JOHO_NO_TANIGEN_NO_KAHO_NO_GYAKUGEN  = {
 	.numerator = -1,
 	.denominator = 1
 };
+*/
 
-Q mkQ(int64_t numerator,int64_t denominator)
-{
-	Q this;
-    this.numerator = numerator;
-    this.denominator = denominator;
-    return this;
-}
-int64_t _gcd(int64_t m,int64_t n){
-    if(n == 0){
-        return m;
-    }
-    return _gcd(n,m%n);
-}
-int64_t gcd(int64_t m,int64_t n){
-	n = (n < 0) ? -1 * n : n;
-	m = (m < 0) ? -1 * m : m;
-	if(m < n){
-		int64_t tmp = m;
-		m = n;
-		n = tmp;
-	}
-    return _gcd(m,n);
-}
+K JOHO_NO_TANIGEN;
+K KAHO_NO_TANIGEN;
+K JOHO_NO_TANIGEN_NO_KAHO_NO_GYAKUGEN;
 
-Q niceQ(Q this){
-    int64_t gcd_val = gcd((this.numerator >= this.denominator) ? this.numerator : this.denominator,
-                         (this.numerator < this.denominator) ? this.numerator : this.denominator);
-    this.numerator /= gcd_val;
-    this.denominator /= gcd_val;
-    if(this.numerator < 0 && this.denominator < 0){
-        this.numerator *= -1;
-        this.denominator *= -1;
-    }else if((this.numerator >= 0 && this.denominator < 0 )){
-        this.numerator *= -1;
-        this.denominator *= -1;
-    }
-    if(this.denominator == 0){
-    	fprintf(stderr,"\n");
-    }
-    return this;
+void initConst(){
+	mpq_set_si(JOHO_NO_TANIGEN,1,1);
+	mpq_set_si(KAHO_NO_TANIGEN,0,1);
+	mpq_set_si(JOHO_NO_TANIGEN_NO_KAHO_NO_GYAKUGEN,-1,1);
 }
-int isQNegative(Q this){
-    this = niceQ(this);
-    return this.numerator < 0;
+void initK(K k){
+	mpq_init(k);
 }
-char * toString(Q this,char *buff){
+void niceQ(Q q){
+	mpq_canonicalize(q);
+}
+void freeQ(Q q){
+	mpq_clear(q);
+}
+int isQNegative(Q m){
+    return (mpq_sgn(m) < 0) ? 1 : 0;
+}
+char * toString(Q q,char *buff){
     char *str = buff;
-    Q current = this;
-    int E = this.numerator / this.denominator;
-
-    if(this.numerator > this.denominator){
-        while(current.numerator > current.denominator){
-            current.denominator *= 10;
-            current = niceQ(current);
-            E++;
-        }
-        E--;
-        current.denominator /= 10;
-    }else{
-        while(current.numerator < current.denominator){
-            current.numerator *= 10;
-            current = niceQ(current);
-            E--;
-        }
-    }
-    if(isQNegative(this)){
-    	str = stpcpy(str,"-");
-    }
-    int64_t integerPart = current.numerator / current.denominator;
-    current.numerator = current.numerator % current.denominator;
-    current.numerator *= 10;
-    current = niceQ(current);
-    char c[2] = {'0','\0'};
-    if(integerPart <= 9){
-        c[0] += integerPart;
-    }
-    str = stpcpy(str,c);
-    str = stpcpy(str,".");
-    size_t size = 6; /*How many chars are gonna be displayed*/
-    while(size-- > 0){
-        integerPart = current.numerator / current.denominator;
-        current.numerator = current.numerator % current.denominator;
-        current.numerator *= 10;
-        current = niceQ(current);
-        c[0] = '0';
-        if(integerPart <= 9){
-            c[0] += integerPart;
-        }
-        str = stpcpy(str,c);
-    }
-    str = stpcpy(str,"e");
-    char _buff[128];
-    sprintf(_buff,"%d",E);
-    str = stpcpy(str,_buff);
-    return buff;
+    sprintf(buff,"%e",mpq_get_d(q));
+    return str;
 }
-
-Q operatorAdd(const Q this,const Q m){
-    const Q larger = (this.denominator >= m.denominator) ? this : m;
-    const Q smaller = (this.denominator < m.denominator) ? this : m;
-    const int64_t denomGCD = gcd(larger.denominator,smaller.denominator);
-    if(denomGCD == 0){
-    	fprintf(stderr,"\n");
-    }
-    int64_t numeratorL = this.numerator * (m.denominator/denomGCD);
-    int64_t numeratorR = m.numerator * (this.denominator/denomGCD);
-    Q ret = mkQ(numeratorL + numeratorR,this.denominator * (m.denominator/denomGCD));
-    return niceQ(ret);
+void copyK(K to,const K from){
+	mpq_init(to);
+	mpq_set(to,from);
 }
-Q operatorSub(const Q this,const Q m){
-    const Q larger = (this.denominator >= m.denominator) ? this : m;
-    const Q smaller = (this.denominator < m.denominator) ? this : m;
-    const int64_t denomGCD = gcd(larger.denominator,smaller.denominator);
-    int64_t numeratorL = this.numerator * (m.denominator/denomGCD);
-    int64_t numeratorR = m.numerator * (this.denominator/denomGCD);
-    Q ret = mkQ(numeratorL - numeratorR,this.denominator * (m.denominator/denomGCD));
-    return niceQ(ret);
+void freeK(K k){
+	freeQ(k);
 }
-
-Q operatorMul(const Q this,const Q m){
-    Q ret = mkQ(this.numerator * m.numerator,this.denominator * m.denominator);
-    return niceQ(ret);
-}
-Q operatorDiv(const Q this,const Q m){
-    Q ret = mkQ(this.numerator * m.denominator,this.denominator * m.numerator);
-    return niceQ(ret);
-}
-
-K str2K(const char *str){
-	char *dot = strchr(str,'.');
-	Q retval = mkQ(0,1);
-	int isNegative = 0;
-	if(str[0] == '-'){
-		 isNegative = 1;
-		 str++;
-	}
-	int64_t base;
-	if(dot == NULL){
-		base = (strlen(str) - 1) * 10;
-	}else{
-		base = 10 * ( (int64_t) (dot - str - 1));
-	}
-	if(base == 0){
-		base = 1;
-	}
-	while(isdigit(*str)){
-		retval.numerator += (*str++ - '0') * base;
-		base /= 10;
-	}
-	if(dot == NULL){
-		goto ret;
-	}
-	str++;
-	base = 10;
-	while(isdigit(*str)){
-		Q add = mkQ((*str++ - '0'),base);
-		retval = operatorAdd(retval,add);
-		base *= 10;
-	}
-	ret:
-	if(isNegative){
-		retval.numerator *= -1;
-	}
-	return niceQ(retval);	
+void str2K(K val,const char *str){
+	mpq_init(val);
+	mpq_set_d(val,atof(str));
 }
 char * K2str(const K k,char *buff){
-	sprintf(buff,"\\frac{%ld}{%ld}",k.numerator,k.denominator);
+	char *__buff = mpq_get_str(NULL,10,k);
+	char *slash = strchr(__buff,'/');
+	if(slash == NULL){
+		strcpy(buff,__buff);
+		sprintf(buff,"%s",__buff);
+	}else{
+		*slash = 0;
+		sprintf(buff,"\\frac{%s}{%s}",__buff,(slash+1));
+	}	
+	free(__buff);
 	return buff;
 }
 
 double K2double(const K k){
-	return ((double)k.numerator)/((double)k.denominator);
+	return mpq_get_d(k);
 }
 
-K addK(const K v1,const K v2){
-	return operatorAdd(v1,v2);
+void addK(K val,const K v1,const K v2){
+	K _v1,_v2;
+	copyK(_v1,v1);
+	copyK(_v2,v2);
+	mpq_add(val,v1,v2);
+	freeK(_v1);
+	freeK(_v2);
+	niceQ(val);
 }
-K subK(const K v1,const K v2){
-	return operatorSub(v1,v2);
+void subK(K val,const K v1,const K v2){
+K _v1,_v2;
+	copyK(_v1,v1);
+	copyK(_v2,v2);
+	mpq_sub(val,v1,v2);
+	freeK(_v1);
+	freeK(_v2);
+	niceQ(val);
 }
-K mulK(const K v1,const K v2){
-	return operatorMul(v1,v2);
+void mulK(K val,const K v1,const K v2){
+K _v1,_v2;
+	copyK(_v1,v1);
+	copyK(_v2,v2);
+	mpq_mul(val,v1,v2);
+	freeK(_v1);
+	freeK(_v2);
+	niceQ(val);
 }
-K divK(const K v1,const K v2){
-	return operatorDiv(v1,v2);
+void divK(K val,const K v1,const K v2){
+K _v1,_v2;
+	copyK(_v1,v1);
+	copyK(_v2,v2);
+	mpq_div(val,v1,v2);
+	freeK(_v1);
+	freeK(_v2);
+	niceQ(val);
 }
 int cmpK(const K v1,const K v2){
-	K diff = subK(v1,v2);
-	if(isQNegative(diff)){
-		return -1;
-	}else if(diff.numerator == 0){
-		return 0;
-	}else{
-		return 1;
-	}
+	return mpq_cmp(v1,v2);
 }
 

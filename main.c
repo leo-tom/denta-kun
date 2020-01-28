@@ -55,6 +55,7 @@ BlackBoard readPreInclude(BlackBoard blackboard){
 int main(int argc,char *argv[]){
 	OUTFILE = stdout;
 	FILE *infile = stdin;
+	initConst();
 	BlackBoard blackboard = readPreInclude(mkBlackBoard());
 	Definition definition = parser(infile,blackboard);
 	unsigned int anonIndex = 0;
