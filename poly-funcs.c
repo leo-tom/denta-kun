@@ -1,28 +1,20 @@
 /*
-Copyright (c) 2019, Leo Tomura
-All rights reserved.
+Copyright 2020, Leo Tomura
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-* Redistributions of source code must retain the above copyright notice, 
-  this list of conditions and the following disclaimer.
-* Redistributions in binary form must reproduce the above copyright notice, 
-  this list of conditions and the following disclaimer in the documentation 
-  and/or other materials provided with the distribution.
-* Neither the name of the Leo Tomura nor the names of its contributors 
-  may be used to endorse or promote products derived from this software 
-  without specific prior written permission.
+This file is part of Dentakun.
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL LEO TOMURA BE LIABLE FOR ANY
-DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+Dentakun is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+Dentakun is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with Dentakun.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include "denta-kun.h"
 
@@ -203,7 +195,6 @@ Poly item2Poly(mut Item item){
 	setPolyType(retval,LEX);
 	retval.ptr.items->degrees = item.degrees;
 	retval.ptr.items->size = item.size;
-	initK(retval.ptr.items->coefficient);
 	copyK(retval.ptr.items->coefficient, item.coefficient);
 	return retval;
 }
@@ -403,7 +394,11 @@ Poly polyDiv(unmut Poly dividend,unmut Poly divisors){
 						.degrees = malloc(sizeof(N)*u.size)
 					};
 					initK(w.coefficient);
+					char _buff[128];
+					fprintf(stderr,"%s DIV ",K2str(u.coefficient,_buff));
+					fprintf(stderr,"%s = ",K2str(g.coefficient,_buff));
 					divK(w.coefficient,u.coefficient , g.coefficient);
+					fprintf(stderr,"%s\n",K2str(w.coefficient,_buff));
 					for(k = 0;k < g.size;k++){
 						w.degrees[k] = u.degrees[k] - g.degrees[k];
 					}
@@ -422,22 +417,24 @@ Poly polyDiv(unmut Poly dividend,unmut Poly divisors){
 					Poly tmp = item2Poly(w);
 					setPolyType(tmp,order);
 					Poly temp = polyMul(tmp,divisor[i]);
-					h = polySort(h,polyType(h));
-					//fprintf(stderr,"h     : ");polyPrint(h,stderr);fprintf(stderr,"\n");
-					//fprintf(stderr,"wf_i  : ");polyPrint(temp,stderr);fprintf(stderr,"\n");
+					//h = polySort(h,polyType(h));
+					fprintf(stderr,"h     : ");polyPrint(h,stderr);fprintf(stderr,"\n");
+					fprintf(stderr,"wf_i  : ");polyPrint(temp,stderr);fprintf(stderr,"\n");
 					Poly tempo = polySub(h,temp);
 					polyFree(h);
 					polyFree(temp);
-					//fprintf(stderr,"h-wf_i: ");polyPrint(tempo,stderr);fprintf(stderr,"\n");fprintf(stderr,"\n");
+					fprintf(stderr,"h-wf_i: ");polyPrint(tempo,stderr);fprintf(stderr,"\n");fprintf(stderr,"\n");
 					h = tempo;
 					Poly newVal = polyAdd(retval[i],tmp);
 					polyFree(retval[i]);
 					retval[i] = newVal;
 					polyFree(tmp);
-					break;
+					polyNice(h);
+					goto cont;
 				}
 			}
 		}
+		cont : 
 		if(!exists){
 			break;
 		}
@@ -628,6 +625,21 @@ int _isSameMonomial(unmut Item v1,unmut Item v2){
 	return 1;
 }
 
+void polyNice(unmut Poly p){
+	if(polySize(p) == 0 || !cmpK(p.ptr.items[0].coefficient,K_0)
+			|| !cmpK(p.ptr.items[0].coefficient,K_1)){
+		return;
+	}
+	size_t j;
+	K gyaku;
+	initK(gyaku);
+	divK(gyaku,K_1,p.ptr.items[0].coefficient);
+	for(j = 0;j < polySize(p);j++){
+		mulK(p.ptr.items[j].coefficient,
+		gyaku,p.ptr.items[j].coefficient);
+	}
+}
+
 Poly polySort(unmut Poly poly,MonomialOrder order){
 	if(polyType(poly) == ARRAY){
 		size_t size = polySize(poly);
@@ -787,13 +799,7 @@ Poly GrobnerBasis2ReducedGrobnerBasis(mut Poly grobner){
 			}
 		}
 		if(!isNullPoly(ptr[i])){
-			K gyaku;
-			initK(gyaku);
-			divK(gyaku,K_1,ptr[i].ptr.items[0].coefficient);
-			for(j = 0;j < polySize(ptr[i]);j++){
-				mulK(ptr[i].ptr.items[j].coefficient,
-					gyaku,ptr[i].ptr.items[j].coefficient);
-			}
+			polyNice(ptr[i]);
 		}
 	}
 	grobner = removeNullPolyFromArray(grobner);
@@ -837,14 +843,7 @@ Poly GrobnerBasis2ReducedGrobnerBasis(mut Poly grobner){
 	size = polySize(grobner);
 	for(i = 0;i < size;i++){
 		Poly p = ptr[i];
-		size_t j;
-		K gyaku;
-		initK(gyaku);
-		divK(gyaku,K_1,p.ptr.items[0].coefficient);
-		for(j = 0;j < polySize(p);j++){
-			mulK(p.ptr.items[j].coefficient,
-			gyaku,p.ptr.items[j].coefficient);
-		}
+		polyNice(p);
 	}
 	return grobner;
 }
