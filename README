@@ -1,8 +1,9 @@
 Denta-kun is an application that calculates Groebner bases from given generators.
 It takes tex-like input, and outputs tex-like text expressing a Groebner base of it.
 
-To compile it, just execute make without any options. It is still in development. Therefore,
-it may not even compile.
+To compile it, you need to install GMP library which you can get from :
+	https://gmplib.org/
+After you successary installed GMP library, move to root directory of dentakun, and execute make.
 
 To run it, give commands to a generated binary. For instance, execute following command to 
 calculate Groebner basis. Make sure you remove '$' when you type following commands.
