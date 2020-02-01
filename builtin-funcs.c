@@ -54,7 +54,13 @@ Poly builtIn_PBB(Poly arg,BlackBoard blackboard){
 }
 
 Poly builtIn_PP(Poly arg,BlackBoard blackboard){
-	polyPrint(arg,OUTFILE);
+	polyPrint(arg,K2str,OUTFILE);
+	fprintf(OUTFILE,"\n");
+	polyFree(arg);
+	return nullPoly;
+}
+Poly builtIn_PPS(Poly arg,BlackBoard blackboard){
+	polyPrint(arg,K2strScientific,OUTFILE);
 	fprintf(OUTFILE,"\n");
 	polyFree(arg);
 	return nullPoly;
@@ -72,40 +78,36 @@ Poly builtIn_SP(Poly arg,BlackBoard blackboard){
 
 Poly builtIn_BBA(Poly array,BlackBoard blackboard){
 	Poly r;
-	size_t capacity = polySize(array);
-	size_t i = polySize(array);
+	size_t size;
 	do{
 		r = isThisGrobnerBasis(array);
+		size = polySize(array);
+		fprintf(stderr,"i : %zu\n",size);
 		#if DEBUG == 1
-		polyPrint(array,stdout);
-		printf("is ");
+		polyPrint(array,K2str,stderr);
+		fprintf(stderr,"is ");
 		#endif
 		if(isZeroPoly(r) || polyDegrees(r) == 0){
 			#if DEBUG == 1
-			printf("Grobner basis.\n ");
+			fprintf(stderr,"Grobner basis.\n ");
 			#endif
 			polyFree(r);
 			fprintf(stderr,"YEY! I found Grobner basis\n");
 			break;
 		}
 		#if DEBUG == 1
-		printf("not Grobner basis because : \n");
-		polyPrint(r,stdout);
-		printf("is not empty.\n");
+		fprintf(stderr,"not Grobner basis because : \n");
+		polyPrint(r,K2str,stderr);
+		fprintf(stderr,"is not empty.\n");
 		#endif
-		fprintf(stderr,"Nope\n");
-		if(i >= capacity){
-			capacity *= 2;
-			array.ptr.polies = realloc(array.ptr.polies,capacity * sizeof(Poly));
-		}
-		array.ptr.polies[i] = r;
-		i++;
-		setPolySize(array,i);
+		polyNice(r);
+		size++;
+		array.ptr.polies = realloc(array.ptr.polies,size * sizeof(Poly));
+		array.ptr.polies[size-1] = r;
+		setPolySize(array,size);
+		//array = removeUnnecessaryPolies(array);
+		//array = GrobnerBasis2ReducedGrobnerBasis(array);
 	}while(1);
-	if(i < capacity){
-		array.ptr.polies = realloc(array.ptr.polies,i * sizeof(array.ptr.polies[0]));
-	}
-	setPolySize(array,i);
 	return GrobnerBasis2ReducedGrobnerBasis(array);
 }
 Poly builtIn_SIM(Poly arg,BlackBoard blackboard){
@@ -153,14 +155,31 @@ Poly builtIn_SRT(Poly arg,BlackBoard blackboard){
 	polyFree(arg);
 	return retval;
 }
+#include <time.h>
+Poly builtIn_CLOCK(Poly arg,BlackBoard blackboard){
+	polyFree(arg);
+	clock_t val = clock();
+	char buff[64] = {0};
+	sprintf(buff,"%llu",(unsigned long long)val);
+	K k;
+	str2K(k,buff);
+	Poly retval = K2Poly(k,LEX);
+	freeK(k);
+	return retval;
+}
 
 //ABCDEFGHIJKLMNOPQRSTUVWXYZ
-const size_t BUILT_IN_FUNC_SIZE = 7;
+const size_t BUILT_IN_FUNC_SIZE = 9;
 const Function BUILT_IN_FUNCS[] = {
 	{
 		.name = "BBA",
 		.description = "Buchberger algorithm",
 		.funcptr = builtIn_BBA
+	},
+	{
+		.name = "CLOCK",
+		.description = "Call clock() function.",
+		.funcptr = builtIn_CLOCK
 	},
 	{
 		.name = "PBB",
@@ -171,6 +190,11 @@ const Function BUILT_IN_FUNCS[] = {
 		.name = "PP",
 		.description = "Print given polynomials.",
 		.funcptr = builtIn_PP
+	},
+	{
+		.name = "PPS",
+		.description = "Print given polynomials with scientific notation.",
+		.funcptr = builtIn_PPS
 	},
 	{
 		.name = "SP",

@@ -44,7 +44,7 @@ void printBlackBoard(BlackBoard blackboard,FILE *fp){
 	size_t i;
 	for(i = 0;i < blackboard.size;i++){
 		fprintf(fp,"%s = ",getNameFromDefinition(&blackboard.array[i]));
-		polyPrint(blackboard.array[i].poly,fp);
+		polyPrint(blackboard.array[i].poly,K2str,fp);
 		fprintf(fp," \\\n");
 	}
 }

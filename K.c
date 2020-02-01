@@ -55,11 +55,6 @@ void freeQ(Q q){
 int isQNegative(Q m){
     return (mpq_sgn(m) < 0) ? 1 : 0;
 }
-char * toString(Q q,char *buff){
-    char *str = buff;
-    sprintf(buff,"%e",mpq_get_d(q));
-    return str;
-}
 void copyK(K to,const K from){
 	mpq_init(to);
 	mpq_set(to,from);
@@ -71,7 +66,7 @@ void str2K(K val,const char *str){
 	mpq_init(val);
 	mpq_set_d(val,atof(str));
 }
-char * K2str(const K k,char *buff){
+char * K2str(K k,char *buff){
 	char *__buff = mpq_get_str(NULL,10,k);
 	char *slash = strchr(__buff,'/');
 	if(slash == NULL){
@@ -84,7 +79,11 @@ char * K2str(const K k,char *buff){
 	free(__buff);
 	return buff;
 }
-
+char * K2strScientific(K k,char *buff){
+    char *str = buff;
+    sprintf(buff,"%e",mpq_get_d(k));
+    return str;
+}
 double K2double(const K k){
 	return mpq_get_d(k);
 }
@@ -96,7 +95,6 @@ void addK(K val,const K v1,const K v2){
 	mpq_add(val,v1,v2);
 	freeK(_v1);
 	freeK(_v2);
-	niceQ(val);
 }
 void subK(K val,const K v1,const K v2){
 K _v1,_v2;
@@ -105,7 +103,6 @@ K _v1,_v2;
 	mpq_sub(val,v1,v2);
 	freeK(_v1);
 	freeK(_v2);
-	niceQ(val);
 }
 void mulK(K val,const K v1,const K v2){
 K _v1,_v2;
@@ -114,7 +111,6 @@ K _v1,_v2;
 	mpq_mul(val,v1,v2);
 	freeK(_v1);
 	freeK(_v2);
-	niceQ(val);
 }
 void divK(K val,const K v1,const K v2){
 K _v1,_v2;
@@ -123,7 +119,6 @@ K _v1,_v2;
 	mpq_div(val,v1,v2);
 	freeK(_v1);
 	freeK(_v2);
-	niceQ(val);
 }
 int cmpK(const K v1,const K v2){
 	return mpq_cmp(v1,v2);

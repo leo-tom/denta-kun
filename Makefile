@@ -1,9 +1,9 @@
 DEBUG ?= 0
-options = -g -ggdb -I/usr/local/include -Wall -DDEBUG=$(DEBUG)
-#options = -02 -Wall -I/usr/local/include
+#options = -g -ggdb -I/usr/local/include -Wall -DDEBUG=$(DEBUG)
+options = -O2 -I/usr/local/include -Wall -DDEBUG=$(DEBUG)
 objs = main.o parser.o poly-funcs.o black-board.o builtin-funcs.o K.o
 headers = denta-kun.h
-CC = gcc
+CC = cc
 RM = rm
 
 all : dentakun

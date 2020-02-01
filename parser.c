@@ -41,16 +41,18 @@ enum NodeType {
 	Number,
 	Block,
 };
+
+#define NODE_STR_SIZE (64)
 typedef struct _Node{
 	enum NodeType type;
-	char str[64];
+	char str[NODE_STR_SIZE];
 	struct _Node *next;
 }Node;
 
 #define append(head,butt,nodeType,data) do{ \
 	Node *newNodeDesu = malloc(sizeof(Node)); \
 	newNodeDesu->type = nodeType; \
-	memcpy(newNodeDesu->str,data,64); \
+	memcpy(newNodeDesu->str,data,NODE_STR_SIZE); \
 	newNodeDesu->next = NULL; \
 	if(butt == NULL){ \
 		head = butt = newNodeDesu; \
@@ -85,14 +87,14 @@ Node * __parser(FILE *stream){
 			case '_':
 			case ',':
 			{
-				char buff[2];
+				char buff[NODE_STR_SIZE];
 				buff[0] = c; buff[1] = 0;
 				append(head,butt,command,buff);
 				break;
 			}
 			case '-':
 			{
-				char buff[16] = {0};
+				char buff[NODE_STR_SIZE] = {0};
 				buff[0] = '+'; buff[1] = 0;
 				append(head,butt,command,buff);
 				strcpy(buff,"-1");
@@ -105,7 +107,7 @@ Node * __parser(FILE *stream){
 					return head;
 				}
 				ungetc(c,stream);
-				char _buff[256] = {0};
+				char _buff[NODE_STR_SIZE] = {0};
 				char *buff = _buff;
 				while(isalpha(c = getNextChar(stream)) ){
 					*buff++ = c;
@@ -139,7 +141,7 @@ Node * __parser(FILE *stream){
 			default :
 			{
 				if(isdigit(c) || c == '-'){
-					char _buff[256] = {0};
+					char _buff[NODE_STR_SIZE] = {0};
 					char *buff = _buff;
 					*buff++ = c;
 					while(isdigit(c = getNextChar(stream)) || c == '.' ){
@@ -153,7 +155,7 @@ Node * __parser(FILE *stream){
 						int tmp = fgetc(stream);
 						ungetc(tmp,stream);
 						if(!isalpha(tmp)){
-							char buff[8];
+							char buff[NODE_STR_SIZE];
 							buff[0] = c; buff[1] = 0;
 							append(head,butt,variable,buff);
 							break;
@@ -161,7 +163,7 @@ Node * __parser(FILE *stream){
 					}
 					
 					{
-						char _buff[256] = {0};
+						char _buff[NODE_STR_SIZE] = {0};
 						char *buff = _buff;
 						*buff++ = c;
 						while(isalpha(c = fgetc(stream)) || c == '_' || isdigit(c) || c == '{' || c == '}'){
@@ -532,7 +534,7 @@ Definition parser(FILE *stream,BlackBoard blackboard){
 			
 			Definition def = takeDefinitionFromNode(nodes,blackboard);
 			fprintf(stderr,"Parsed as : ");
-			polyPrint(def.poly,stderr);
+			polyPrint(def.poly,K2str,stderr);
 			fprintf(stderr,"\n");
 			return def;
 		#endif

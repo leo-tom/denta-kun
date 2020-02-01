@@ -35,14 +35,7 @@ along with Dentakun.  If not, see <http://www.gnu.org/licenses/>.
 
 extern FILE *OUTFILE;
 
-/*
-typedef __int128_t Qint;
 
-typedef struct {
-	Qint numerator;
-	Qint denominator;
-}Q;
-*/
 typedef mpq_t Q; 
 
 typedef Q Numeric;
@@ -55,18 +48,14 @@ extern K JOHO_NO_TANIGEN; //1
 extern K KAHO_NO_TANIGEN; //0
 extern K JOHO_NO_TANIGEN_NO_KAHO_NO_GYAKUGEN; //-1
 void initConst();
-/*
-extern const K JOHO_NO_TANIGEN; //1
-extern const K KAHO_NO_TANIGEN; //0
-extern const K JOHO_NO_TANIGEN_NO_KAHO_NO_GYAKUGEN; //-1
-*/
 #define K_1 JOHO_NO_TANIGEN
 #define K_0 KAHO_NO_TANIGEN 
 #define K_N1 JOHO_NO_TANIGEN_NO_KAHO_NO_GYAKUGEN
 
 int cmpK(const K v1,const K v2);
 void str2K(K val,const char *str);
-char * K2str(const K k,char *buff);
+char * K2str(K k,char *buff);
+char * K2strScientific(K k,char *buff);
 double K2double(const K k);
 void addK(K val,const K v1,const K v2);
 void subK(K val,const K v1,const K v2);
@@ -170,6 +159,7 @@ Poly polySim(unmut Poly dividend,unmut Poly divisors);
 Poly polyS(unmut Poly f,unmut Poly g);
 void polyNice(unmut Poly p);
 
+Poly K2Poly(mut K k,MonomialOrder order);
 int isZeroPoly(unmut Poly poly);
 N polyDegrees(unmut Poly p);
 Item __polyIn(unmut Poly poly);
@@ -177,7 +167,7 @@ Item _polyIn(unmut Poly poly);
 Poly polyIn(unmut Poly poly);
 Poly item2Poly(mut Item item);
 Poly polySort(unmut Poly poly,MonomialOrder order);
-void polyPrint(unmut Poly poly,FILE *fp);
+void polyPrint(unmut Poly poly,char*(*printer)(K , char *),FILE *fp);
 Poly appendItem2Poly(mut Poly poly,mut Item item);
 double poly2Double(unmut Poly poly);
 Poly polyDup(unmut Poly poly);
@@ -187,5 +177,6 @@ Poly * unwrapPolyArray(mut Poly poly);
 
 Poly isThisGrobnerBasis(unmut Poly array);
 Poly GrobnerBasis2ReducedGrobnerBasis(mut Poly grobner);
+Poly removeUnnecessaryPolies(Poly grobner);
 
 #endif
