@@ -18,49 +18,17 @@ along with Dentakun.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include "denta-kun.h"
 
-/*
-const K JOHO_NO_TANIGEN = {
-	.numerator = 1,
-	.denominator = 1
-};
-
-const K KAHO_NO_TANIGEN = {
-	.numerator = 0,
-	.denominator = 1
-};
-const K JOHO_NO_TANIGEN_NO_KAHO_NO_GYAKUGEN  = {
-	.numerator = -1,
-	.denominator = 1
-};
-*/
-
 K JOHO_NO_TANIGEN;
 K KAHO_NO_TANIGEN;
 K JOHO_NO_TANIGEN_NO_KAHO_NO_GYAKUGEN;
-
+#if RATIONAL
 void initConst(){
+	initK(JOHO_NO_TANIGEN);
+	initK(KAHO_NO_TANIGEN);
+	initK(JOHO_NO_TANIGEN_NO_KAHO_NO_GYAKUGEN);
 	mpq_set_si(JOHO_NO_TANIGEN,1,1);
 	mpq_set_si(KAHO_NO_TANIGEN,0,1);
 	mpq_set_si(JOHO_NO_TANIGEN_NO_KAHO_NO_GYAKUGEN,-1,1);
-}
-void initK(K k){
-	mpq_init(k);
-}
-void niceQ(Q q){
-	mpq_canonicalize(q);
-}
-void freeQ(Q q){
-	mpq_clear(q);
-}
-int isQNegative(Q m){
-    return (mpq_sgn(m) < 0) ? 1 : 0;
-}
-void copyK(K to,const K from){
-	mpq_init(to);
-	mpq_set(to,from);
-}
-void freeK(K k){
-	freeQ(k);
 }
 void str2K(K val,const char *str){
 	mpq_init(val);
@@ -83,9 +51,6 @@ char * K2strScientific(K k,char *buff){
     char *str = buff;
     sprintf(buff,"%e",mpq_get_d(k));
     return str;
-}
-double K2double(const K k){
-	return mpq_get_d(k);
 }
 
 void addK(K val,const K v1,const K v2){
@@ -120,7 +85,25 @@ K _v1,_v2;
 	freeK(_v1);
 	freeK(_v2);
 }
-int cmpK(const K v1,const K v2){
-	return mpq_cmp(v1,v2);
-}
 
+#elif BOOLEAN
+void initConst(){
+	K_1 = 1;
+	K_0 = 0;
+	K_N1 = 1;
+}
+char * K2str(K k,char *buff){
+	if(k){
+		buff[0] = '1';
+	}else{
+		buff[0] = '0';
+	}
+	buff[1] = 0;
+	return buff;
+}
+char * K2strScientific(K k,char *buff){
+    return K2str(k,buff);
+}
+#else
+#error Nope.
+#endif

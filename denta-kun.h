@@ -35,12 +35,22 @@ along with Dentakun.  If not, see <http://www.gnu.org/licenses/>.
 
 extern FILE *OUTFILE;
 
+#if !(RATIONAL || BOOLEAN)
+#define RATIONAL (1)
+#endif
 
+#if RATIONAL
 typedef mpq_t Q; 
-
 typedef Q Numeric;
-//typedef uint64_t Natural;
 typedef int64_t Natural;
+#elif BOOLEAN
+typedef unsigned char B;
+typedef B Numeric;
+typedef unsigned char Natural;
+#else
+#error Nope. 
+#endif
+
 
 typedef Numeric K;
 typedef Natural N;
@@ -52,18 +62,38 @@ void initConst();
 #define K_0 KAHO_NO_TANIGEN 
 #define K_N1 JOHO_NO_TANIGEN_NO_KAHO_NO_GYAKUGEN
 
-int cmpK(const K v1,const K v2);
+#if RATIONAL
+
 void str2K(K val,const char *str);
 char * K2str(K k,char *buff);
 char * K2strScientific(K k,char *buff);
-double K2double(const K k);
 void addK(K val,const K v1,const K v2);
 void subK(K val,const K v1,const K v2);
 void mulK(K val,const K v1,const K v2);
 void divK(K val,const K v1,const K v2);
-void freeK(K k);
-void copyK(K to,const K from);
-void initK(K k);
+#define K2double(k) mpq_get_d(k)
+#define cmpK(v1,v2) mpq_cmp(v1,v2)
+#define freeK(k) mpq_clear(k)
+#define copyK(to,from) (mpq_init(to), mpq_set(to,from),to)
+#define initK(k) (mpq_init(k),k)
+
+#elif BOOLEAN
+char * K2str(K k,char *buff);
+char * K2strScientific(K k,char *buff);
+#define addK(val,v1,v2) (val = (v1 & 0x1) ^ (v2 & 0x1))
+#define subK(val,v1,v2) (val = (v1 & 0x1) ^ (v2 & 0x1))
+#define mulK(val,v1,v2) (val = (v1 & v2) & 0x1)
+#define divK(val,v1,v2) (val = v1 / v2 )
+#define str2K(val,str) ( (atoi(str)%2) ? (val = 1) : (val = 0) )
+#define K2double(k) ((double) k)
+#define cmpK(v1,v2) (v1 == v2 ? 0 : (v1 > v2 ? 1 : -1))
+#define freeK(k)
+#define copyK(to,from) (to = from)
+#define initK(k) (k=0)
+
+#else
+#error Nope. 
+#endif
 
 typedef enum _MonomialOrder{
 	LEX,
@@ -97,10 +127,10 @@ typedef struct __Poly__{
 void _setPolySize(Poly *poly,size_t size);
 void _setPolyType(Poly *poly,MonomialOrder);
 
-#define polySize(p) (p.size & 0xfffffffffffffff)
-#define polyType(p) ((p.size >> 60) == MONOMIAL_ORDER_IN_BIN__RLEX ? RLEX : \
-					 ((p.size >> 60) == MONOMIAL_ORDER_IN_BIN__PLEX ? PLEX : ( \
-					  (p.size >> 60) == MONOMIAL_ORDER_IN_BIN__LEX ? LEX : ARRAY)))
+#define polySize(p) ((p).size & 0xfffffffffffffff)
+#define polyType(p) (((p).size >> 60) == MONOMIAL_ORDER_IN_BIN__RLEX ? RLEX : \
+					 (((p).size >> 60) == MONOMIAL_ORDER_IN_BIN__PLEX ? PLEX : ( \
+					  ((p).size >> 60) == MONOMIAL_ORDER_IN_BIN__LEX ? LEX : ARRAY)))
 
 #define setPolySize(polynomial,newSize) _setPolySize(&polynomial,newSize)
 #define setPolyType(polynomial,typeToBeSet) _setPolyType(&polynomial,typeToBeSet)
@@ -133,6 +163,7 @@ extern const size_t BUILT_IN_FUNC_SIZE;
 Poly callBuiltInFunc(const char *name,Poly arg,BlackBoard blackboard);
 
 extern const Poly nullPoly;
+extern const Poly zeroPoly;
 extern const Definition nullDefinition;
 int isNullPoly(unmut Poly poly);
 int isNullDefinition(unmut Definition definition);
@@ -175,7 +206,7 @@ void polyFree(mut Poly v);
 Poly mkPolyArray(mut Poly *array,size_t size);
 Poly * unwrapPolyArray(mut Poly poly);
 
-Poly isThisGrobnerBasis(unmut Poly array);
+Poly isThisGrobnerBasis(Poly array);
 Poly GrobnerBasis2ReducedGrobnerBasis(mut Poly grobner);
 Poly removeUnnecessaryPolies(Poly grobner);
 

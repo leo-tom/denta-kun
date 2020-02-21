@@ -80,9 +80,8 @@ Poly builtIn_BBA(Poly array,BlackBoard blackboard){
 	Poly r;
 	size_t size;
 	do{
-		r = isThisGrobnerBasis(array);
 		size = polySize(array);
-		fprintf(stderr,"i : %zu\n",size);
+		r = isThisGrobnerBasis(array);
 		#if DEBUG == 1
 		polyPrint(array,K2str,stderr);
 		fprintf(stderr,"is ");
@@ -92,7 +91,6 @@ Poly builtIn_BBA(Poly array,BlackBoard blackboard){
 			fprintf(stderr,"Grobner basis.\n ");
 			#endif
 			polyFree(r);
-			fprintf(stderr,"YEY! I found Grobner basis\n");
 			break;
 		}
 		#if DEBUG == 1
@@ -155,26 +153,58 @@ Poly builtIn_SRT(Poly arg,BlackBoard blackboard){
 	polyFree(arg);
 	return retval;
 }
-#include <time.h>
+#include <sys/time.h>
 Poly builtIn_CLOCK(Poly arg,BlackBoard blackboard){
 	polyFree(arg);
-	clock_t val = clock();
-	char buff[64] = {0};
-	sprintf(buff,"%llu",(unsigned long long)val);
+	#if BOOLEAN
+	struct timeval tval;
+	gettimeofday(&tval,0);
+	fprintf(stderr,"%e\n",((double) tval.tv_sec * 1000000.0) + tval.tv_usec);
+	return nullPoly;
+	#else
+	K shifter,ksec,kmic;
+	initK(shifter);
+	initK(ksec);
+	initK(kmic);
+	mpq_set_si(shifter,1000000,1);
+	struct timeval tval;
+	gettimeofday(&tval,0);
 	K k;
-	str2K(k,buff);
+	initK(k);
+	mpq_set_si(ksec,tval.tv_sec,1);
+	mpq_set_si(kmic,tval.tv_usec,1);
+	mulK(k,ksec,shifter);
+	addK(k,k,kmic);
 	Poly retval = K2Poly(k,LEX);
 	freeK(k);
+	freeK(ksec);
+	freeK(kmic);
+	freeK(shifter);
 	return retval;
+	#endif
+}
+
+extern Poly BCA(Poly arg,BlackBoard blackboard);
+
+Poly builtIn_BCA(Poly arg,BlackBoard blackboard){
+	#if !BOOLEAN
+	fprintf(stderr,"This function can be used only in boolean mode.");
+	DIE;
+	#endif
+	return BCA(arg,blackboard);
 }
 
 //ABCDEFGHIJKLMNOPQRSTUVWXYZ
-const size_t BUILT_IN_FUNC_SIZE = 9;
 const Function BUILT_IN_FUNCS[] = {
 	{
 		.name = "BBA",
 		.description = "Buchberger algorithm",
 		.funcptr = builtIn_BBA
+	},
+	{
+		.name = "BCA",
+		.description = "Boolean Cellular Automaton",
+		.funcptr = builtIn_BCA
 	},
 	{
 		.name = "CLOCK",
@@ -218,4 +248,5 @@ const Function BUILT_IN_FUNCS[] = {
 	}
 	
 };
+const size_t BUILT_IN_FUNC_SIZE = sizeof(BUILT_IN_FUNCS)/sizeof(Function);
 

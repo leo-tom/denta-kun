@@ -1,7 +1,8 @@
 DEBUG ?= 0
-#options = -g -ggdb -I/usr/local/include -Wall -DDEBUG=$(DEBUG)
-options = -O2 -I/usr/local/include -Wall -DDEBUG=$(DEBUG)
-objs = main.o parser.o poly-funcs.o black-board.o builtin-funcs.o K.o
+BOOLEAN ?= 0
+DEBUGSTR != if [ $(DEBUG) -eq 1 ] ;  then  echo '-g -ggdb' ; else echo '-O2' ; fi;
+options =  $(DEBUGSTR) -I/usr/local/include -Wall -DDEBUG=$(DEBUG) -DBOOLEAN=$(BOOLEAN)
+objs = main.o parser.o poly-funcs.o black-board.o builtin-funcs.o K.o bca.o
 headers = denta-kun.h
 CC = cc
 RM = rm
@@ -29,5 +30,8 @@ builtin-funcs.o : builtin-funcs.c
 K.o : K.c
 	$(CC) $(options) -c $<
 
+bca.o : bca.c
+	$(CC) $(options) -c $<
+
 clean :
-	$(RM) $(objs)
+	$(RM) -f $(objs)

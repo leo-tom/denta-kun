@@ -23,6 +23,12 @@ const Poly nullPoly = {
 	.ptr.items = NULL
 };
 
+Item _zeroItem[] = { {.size = 0,.degrees = 0}};
+const Poly zeroPoly = {
+	.size = 1,
+	.ptr.items = _zeroItem
+};
+
 /*
 S.<x,y,z> = PolynomialRing(QQ, 3, order='deglex')
 J = Ideal([x^3 - 3*x^2 - y + 1, -x^2 + y^2 - 1])
@@ -148,10 +154,14 @@ void polyPrint(unmut Poly poly,char*(*printer)(K , char *),FILE *fp){
 		Poly *head = poly.ptr.polies;
 		fprintf(fp,"(");
 		while(size--){
-			polyPrint(*head++,printer,fp);
+			polyPrint(*head,printer,fp);
 			if(size != 0){
 				fprintf(fp," , ");
 			}
+			if(polyType(*head) == ARRAY){
+				fprintf(fp,"\n");
+			}
+			head++;
 		}
 		fprintf(fp," )");
 		return;
@@ -173,17 +183,21 @@ void polyPrint(unmut Poly poly,char*(*printer)(K , char *),FILE *fp){
 			if(!first && !cmpK(item.coefficient,K_1)){
 				fprintf(fp,"+ ");
 			}else if(!cmpK(item.coefficient,K_N1)){
+				#if BOOLEAN == 1
+				if(!first) {
+					fprintf(fp,"+ ");
+				}
+				#else
 				fprintf(fp,"- ");
+				#endif
 			}else if( first ){
 				;
 			}else{
 				DIE;
 			}
-			first = 0;
 		}else{
 			char buff[128] = {0};
 			if(first){
-				first = 0;
 				fprintf(fp,"%s ",printer(item.coefficient,buff));
 			}else if(cmpK(item.coefficient,JOHO_NO_TANIGEN) < 0){
 				K tmp;
@@ -197,9 +211,14 @@ void polyPrint(unmut Poly poly,char*(*printer)(K , char *),FILE *fp){
 		int i;
 		for(i = 0; i < item.size;i++){
 			if(item.degrees[i]){
+				#if BOOLEAN
+				fprintf(fp,"x_{%d}^{%d} ",i,item.degrees[i]);
+				#else
 				fprintf(fp,"x_{%d}^{%ld} ",i,item.degrees[i]);
+				#endif
 			}
 		}
+		first = 0;
 	}
 }
 Poly item2Poly(mut Item item){
@@ -291,9 +310,7 @@ Poly polyAdd(unmut Poly v1,unmut Poly v2){
 		retval.ptr.items = realloc(retval.ptr.items,sizeof(Item)*index);
 		setPolySize(retval,index);
 	}
-	//return retval;
-	Poly tmp = polySort(retval,polyType(retval));polyFree(retval);
-	return tmp;
+	return retval;
 }
 Poly polySub(unmut Poly v1,unmut Poly v2){
 	int i;
@@ -348,9 +365,6 @@ Poly polyMul(unmut Poly v1,unmut Poly v2){
 	setPolyType(retval,order);
 	Poly tmp = retval;
 	retval = polySort(tmp,order);
-	if(isNullPoly(retval)){
-		DIE;
-	}
 	polyFree(tmp);
 	return retval;
 }
@@ -641,6 +655,9 @@ int _isSameMonomial(unmut Item v1,unmut Item v2){
 }
 
 void polyNice(unmut Poly p){
+	#if !RATIONAL
+	return;
+	#endif
 	if(polySize(p) == 0 || !cmpK(p.ptr.items[0].coefficient,K_0)
 			|| !cmpK(p.ptr.items[0].coefficient,K_1)){
 		return;
@@ -697,6 +714,13 @@ Poly polySort(unmut Poly poly,MonomialOrder order){
 			free(retval.ptr.items[index].degrees);
 			index--;
 			someThingDisappeared = 1;
+		}else{
+			int k;
+			for(k = 0;k < retval.ptr.items[index].size;k++){
+				if(retval.ptr.items[index].degrees[k]){
+					retval.ptr.items[index].degrees[k] = 1;
+				}
+			}
 		}
 		i = j - 1;
 		index++;
@@ -796,7 +820,6 @@ Poly removeUnnecessaryPolies(Poly grobner){
 	return grobner;
 }
 
-char i_j_memo[256][256] = {};
 /*Returns 0 if array is grobner basis*/
 /*Returns reminder of S(g_i,g_j) divided by array*/
 Poly isThisGrobnerBasis(Poly array){
@@ -806,18 +829,13 @@ Poly isThisGrobnerBasis(Poly array){
 	Poly reminder;
 	for(i = 0;i < s;i++){
 		for(j = i + 1;j < s;j++){
-			if(i_j_memo[i][j]){
-				continue;
-			}
 			if(_isCoprime(__polyIn(ptr[i]),__polyIn(ptr[j]))){
-				i_j_memo[i][j] = 1;
 				continue;
 			}
 			Poly s_i_j = polyS(ptr[i],ptr[j]);
 			reminder = polySim(s_i_j,array);polyFree(s_i_j);
 			if(isZeroPoly(reminder)){
 				polyFree(reminder);
-				i_j_memo[i][j] = 1;
 			}else{
 				goto ret;
 			}

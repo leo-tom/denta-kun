@@ -21,7 +21,17 @@ along with Dentakun.  If not, see <http://www.gnu.org/licenses/>.
 
 FILE *OUTFILE = NULL;
 
-const char PRE_INCLUDE[] = "LEX = 0 \\\\ RLEX = 1 \\\\ PLEX = 2\\\\";
+const char PRE_INCLUDE[] = 
+	"LEX = 0 \\\\ RLEX = 1 \\\\ PLEX = 2\\\\"
+	#if BOOLEAN
+	"BCA_INITIAL_STATE = 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,"
+	"0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,"
+	"0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,"
+	"0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,"
+	"0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,"
+	"0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 \\\\"
+	#endif
+	;
 
 BlackBoard readPreInclude(BlackBoard blackboard){
 	int fds[2];
@@ -43,11 +53,12 @@ BlackBoard readPreInclude(BlackBoard blackboard){
 	}
 	return sortBlackBoard(blackboard);
 }
-
+#include <time.h>
 int main(int argc,char *argv[]){
 	OUTFILE = stdout;
 	FILE *infile = stdin;
 	initConst();
+	copyK(zeroPoly.ptr.items[0].coefficient,K_0);
 	BlackBoard blackboard = readPreInclude(mkBlackBoard());
 	Definition definition = parser(infile,blackboard);
 	unsigned int anonIndex = 0;
@@ -60,8 +71,6 @@ int main(int argc,char *argv[]){
 		blackboard = insert2BlackBoard(blackboard,definition);
 		definition = parser(infile,blackboard);
 	}
-	blackboard = sortBlackBoard(blackboard);
-	
 	return 0;
 }
 

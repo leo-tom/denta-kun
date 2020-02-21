@@ -105,7 +105,17 @@ BlackBoard insert2BlackBoard(mut BlackBoard blackboard,mut Definition def){
 		blackboard.capacity *= 2;
 		blackboard.array = realloc(blackboard.array,sizeof(Definition)*blackboard.capacity);
 	}
-	blackboard.array[blackboard.size++] = def;
+	Definition tmp = mkDefinition(getNameFromDefinition(&def),strlen(getNameFromDefinition(&def)),nullPoly);
+	Definition *ptr = bsearch(&tmp,blackboard.array,blackboard.size,sizeof(Definition)
+						,(int (*)(const void *, const void *))cmpDefinition);
+	freeDefinition(tmp);
+	if(ptr == NULL){
+		blackboard.array[blackboard.size++] = def;
+	}else{
+		freeDefinition(*ptr);
+		*ptr = def;
+	}
+	blackboard = sortBlackBoard(blackboard);
 	return blackboard;
 }
 
