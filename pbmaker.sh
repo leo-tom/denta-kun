@@ -1,5 +1,21 @@
 #! /bin/sh -
-make DEBUG=0 BOOLEAN=1
+#Copyright 2020, Leo Tomura
+#
+#This file is part of Dentakun.
+#
+#Dentakun is free software: you can redistribute it and/or modify
+#it under the terms of the GNU General Public License as published by
+#the Free Software Foundation, either version 3 of the License, or
+#(at your option) any later version.
+#
+#Dentakun is distributed in the hope that it will be useful,
+#but WITHOUT ANY WARRANTY; without even the implied warranty of
+#MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#GNU General Public License for more details.
+#
+#You should have received a copy of the GNU General Public License
+#along with Dentakun.  If not, see <http://www.gnu.org/licenses/>.
+#
 FIFO_FILE='_FIFO_PBMAKER_'
 RULE=1
 if [ $# -ge 1 ]
@@ -20,7 +36,7 @@ fi
 
 if [ -z $SIZE ]
 then
-	SIZE='256'
+	SIZE='-1'
 fi
 if [ -z $SEED ]
 then
@@ -43,15 +59,26 @@ fi
 awk -v "rule=$RULE" -v "size=$SIZE" -v "seed=$SEED" 'BEGIN{
 	if(size <= 0){
 		size = 256;
+	}else if(seed < 0){
+		printf("BCA_INITIAL_STATE = ");
+		for(i = 0;i < size-1;i++){
+			if(i == size / 2){
+				printf("1,");
+			}else{
+				printf("0,");
+			}
+		}
+		printf("0 \\\\\n");
 	}
 	if(seed >= 0){
 		printf("BCA_INITIAL_STATE = ");
 		srand(seed);
 		for(i = 0;i < size-1;i++){
-			printf("%d , ",(rand()*10)%2);
+			printf("%d,",(rand()*10)%2);
 		}
 		printf("%d \\\\\n",(rand()*10)%2);
 	}
+	print "f0 = 0 \\\\\n"
 	subscript = 0;
 	if(and(rule, 1)){
 		printf("f%d = 1 \\\\\n",subscript++);
@@ -78,7 +105,7 @@ awk -v "rule=$RULE" -v "size=$SIZE" -v "seed=$SEED" 'BEGIN{
 	printf("f0 \\\\\n");
 	printf("\\PP(\\BCA(f)) \\\\\n");
 }
-' | ./dentakun | sed 'y/(),/   /; s/ //g ; /^$/d' >> $FIFO_FILE
+' | bentakun | sed 'y/(),/   /; s/ //g ; /^$/d' >> $FIFO_FILE
 
 rm -f $FIFO_FILE
 

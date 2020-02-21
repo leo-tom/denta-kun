@@ -19,6 +19,8 @@ along with Dentakun.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "denta-kun.h"
 
+#if BOOLEAN
+
 #define EDGE_TYPE_PERIODIC (1)
 #define EDGE_TYPE_REFLECTIVE (2)
 #define EDGE_TYPE_FIXED (3)
@@ -161,3 +163,5 @@ Poly BCA(Poly arg,BlackBoard blackboard){
 	Poly retval = _BCA(buff,bca_size,poly,edge_type,edge_value);
 	return retval;
 }
+
+#endif
