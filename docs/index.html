@@ -30,7 +30,7 @@ If you are Japanese speaker who did not find it funny, you have no soul.
 <h3>Basics</h3>
 <p>
 First, look at following code of Dentakun. It defines 3 polynomials. They are named f1,f2, and f3.
-You need to append "\\" each line to tell Dentakun that this is end of a line.
+You need to append "\\" to each lines to tell Dentakun that this is end of a line.
 Dentakun ignores newline character, so you can insert it anyware you want.
 <div style="text-align: left;"><span>
 f1 = x_2 x_1 x_0 - 1 \\ <br>
@@ -46,7 +46,7 @@ G = \BBA(I) \\ <br>
 The 4th line of code defines "list" of polynomials with f1, f2, and f3. 5th line of code redefines variable "I" with
 return value of function "SRT". when you call function in Dentakun, you need to write "\" before the name of function.
 "SRT" function sorts a polynomial or all polynomials in the list. In this example, polynomials are sorted using Lexical order.
-There are 3 orders available : LEX, RLEX, PLEX. RLEX is reversed version of LEX. PLEX ignores degrees of polynomial and do
+There are 3 orders available : LEX, RLEX, and PLEX. RLEX is reversed version of LEX. PLEX ignores degrees of polynomial and do
 "pure" lexical ordering. Note that LEX does care degree of each monomials when sorting.
 </p>
 <p>
@@ -71,7 +71,7 @@ For example, definition of a unit circle would be :
 </p>
 
 <p>
-When you do not use '=' , say you just typed
+When you did not use '=' , for instance, if you just typed
 <div style="text-align: center;">x^2 + x_1^2 - 1 \\</div>
 the polynomial can be referenced from variable named "$n" where n is current line number. 
 </p>
@@ -115,6 +115,7 @@ There are some pre-defined variables. Here are list of it :
 	<td>1</td>
 	<td>
 		Set it "1" to make BCA function treat edges periodically.
+		It has to be set to 0 if BCA_REFLECTIVE or BCA_FIXED are 1.
 	</td>
 </tr>
 <tr>
@@ -122,6 +123,7 @@ There are some pre-defined variables. Here are list of it :
 	<td>0</td>
 	<td>
 		Set it "1" to make BCA function treat edges reflectively.
+		It has to be set to 0 if BCA_PERIODIC or BCA_FIXED are 1.
 	</td>
 </tr>
 <tr>
@@ -130,6 +132,7 @@ There are some pre-defined variables. Here are list of it :
 	<td>
 		Set it "1" to make BCA function treat edges with fixed value.
 		You can set fixed value to BCA_FIXED_VALUE.
+		It has to be set to 0 if BCA_REFLECTIVE or BCA_PERIODIC are 1.
 	</td>
 </tr>
 <tr>
