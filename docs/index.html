@@ -12,7 +12,14 @@
 	<title>Denta-kun no tsukai kata(How to use Denta-kun)</title>
 </head>
 <body class="ALL">
-<h1>How to</h1>
+<img src="dentakun.svg" width="300" height="300" alt="Dentakun">
+<h1>Introduction</h1>
+<p>
+This document is about Dentakun. Dentakun is software which is capable of calculating numbers and polynomials.
+Dentakun was originally developed to make my understanding to Groebner basis.
+Dentakun is also capable of expressing cellular automaton.
+</p>
+<h1>How to use Dentakun</h1>
 <h2>Basic syntax</h2>
 <h3>Basics</h3>
 <p>
@@ -69,7 +76,17 @@ the polynomial can be referenced from variable named "$n" where n is current lin
 
 <p>
 There are some pre-defined variables. Here are list of it : 
-
+<table border=1>
+<caption>Variables</caption>
+<tr><th>Name</th><th>Members</th><th>Notes</th></tr>
+<tr>
+	<td>LEX</td>
+	<td>1</td>
+	<td>
+		
+	</td>
+</tr>
+</table>
 <p>
 
 <h1>What Denta-kun does inside</h1>
@@ -103,11 +120,9 @@ Node is used to parse input and generate Poly and such.
 <tr><th>Name</th><th>Members</th><th>Notes</th></tr>
 <tr>
 	<td>K</td>
-	<td>This is just "typedefed" double(64 bits floating point number).</td>
+	<td>This is mpq_t in dentakun, char in bentakun</td>
 	<td>
 		K is used to store coefficients of an Item.
-		For now, K is simply double. However in the future release, it may be changed to other element of 
-		a Field or Ring.
 	</td>
 </tr>
 <tr>

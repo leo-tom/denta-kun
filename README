@@ -25,6 +25,8 @@ G = \BBA(I) \\
 bentakun also has functionality to peform as ECD(Elementary Cellular Automaton). Try executing
 	dentakun-bca-tool <rule>
 where <rule> is a integer between 0 to 255. You can specify Wolfram code through <rule>.
+I highly recomment you to install ImageMagick into your sysytem. dentakun-bca-tool uses it to
+generate png file. If not, dentakun-bca-tool generates bmp file which becomes huge.
 If you like to see how all ECDs works, you would like to do :
 	cd pics
 	./generator.sh
