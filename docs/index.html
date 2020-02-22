@@ -15,9 +15,15 @@
 <img src="dentakun.svg" width="300" height="300" alt="Dentakun">
 <h1>Introduction</h1>
 <p>
-This document is about Dentakun. Dentakun is software which is capable of calculating numbers and polynomials.
-Dentakun was originally developed to make my understanding to Groebner basis.
+This document is about Dentakun. Dentakun is software which calculates polynomials.
+Dentakun was originally developed to make my understanding to Groebner basis deeper.
 Dentakun is also capable of expressing cellular automaton.
+</p>
+<p>
+The image you are seeing above is Denta-kun. Calculator is called 電卓(Hiragana:でんたく,Roman:Dentaku) in Japanse.
+I don't know how I should explain "kun" so just google it(actually, I reccomend you to use ecosia instead).
+Dentakun(電太君) was named combining two words 電卓(calculator) and 君(kun) i.e. its name is funny.
+If you are Japanese speaker who did not find it funny, you have no soul.
 </p>
 <h1>How to use Dentakun</h1>
 <h2>Basic syntax</h2>
@@ -53,13 +59,9 @@ I don't need to rewrite this document while suffering from regrets.
 </p>
 <h3>Variable</h3>
 <p>
-Use '=' to define constants. For instance, to make value of LEGALISE 420, do :
+Use '=' to define constants. For instance, to set value 420 to variable LEGALISE, do :
 <div style="text-align: center;">LEGALISE = 420 \\</div>
-If you want to name indexed constants you do as you would :
-<div style="text-align: center;">
-a_1 = 123 \\<br>
-a_2 = 456 \\<br>
-</div>
+You can also use digital numbers for variable name, but name of variables must not start from digits.
 </p>
 <p>
 You cannot use 'x' as name of constants you define. 'x' is used to define polynomial.
@@ -78,12 +80,64 @@ the polynomial can be referenced from variable named "$n" where n is current lin
 There are some pre-defined variables. Here are list of it : 
 <table border=1>
 <caption>Variables</caption>
-<tr><th>Name</th><th>Members</th><th>Notes</th></tr>
+<tr><th>Name</th><th>Value</th><th>Notes</th></tr>
 <tr>
 	<td>LEX</td>
 	<td>1</td>
 	<td>
-		
+		Magic number used to specify monomial order.
+	</td>
+</tr>
+<tr>
+	<td>RLEX</td>
+	<td>2</td>
+	<td>
+		Magic number used to specify monomial order.
+	</td>
+</tr>
+<tr>
+	<td>PLEX</td>
+	<td>3</td>
+	<td>
+		Magic number used to specify monomial order.
+	</td>
+</tr>
+<tr>
+	<td>BCA_INITIAL_STATE</td>
+	<td>0,0, ... , 1 , 0,0, ...</td>
+	<td>
+		List of 0 and 1 used for initial state of cellular automaton. You can change this value to change initial state of
+		cellular automaton. Also, you can resize it as you want.
+	</td>
+</tr>
+<tr>
+	<td>BCA_PERIODIC</td>
+	<td>1</td>
+	<td>
+		Set it "1" to make BCA function treat edges periodically.
+	</td>
+</tr>
+<tr>
+	<td>BCA_REFLECTIVE</td>
+	<td>0</td>
+	<td>
+		Set it "1" to make BCA function treat edges reflectively.
+	</td>
+</tr>
+<tr>
+	<td>BCA_FIXED</td>
+	<td>0</td>
+	<td>
+		Set it "1" to make BCA function treat edges with fixed value.
+		You can set fixed value to BCA_FIXED_VALUE.
+	</td>
+</tr>
+<tr>
+	<td>BCA_FIXED_VALUE</td>
+	<td>0</td>
+	<td>
+		This variable is used only when BCA_FIXED is set to 1.
+		BCA function use this value for fixed value when treating edges.
 	</td>
 </tr>
 </table>

@@ -119,7 +119,7 @@ Poly _BCA(char **buff,size_t size,Poly poly,int edge_type,char edge_value){
 Poly BCA(Poly arg,BlackBoard blackboard){
 	Poly poly;
 	int i;
-	int edge_type = EDGE_TYPE_PERIODIC;
+	int edge_type = 420;
 	char edge_value = 0;
 	if(polyType(arg) != ARRAY){
 		poly = arg;
@@ -151,6 +151,8 @@ Poly BCA(Poly arg,BlackBoard blackboard){
 		}
 		goto next;
 	}
+	fprintf(stderr, "I don't know how I should treat edges.\n");
+	DIE;
 	next : ;
 	Poly _vector = findFromBlackBoard(blackboard,"BCA_INITIAL_STATE",strlen("BCA_INITIAL_STATE"));
 	if(polyType(_vector) != ARRAY){
