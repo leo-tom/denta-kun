@@ -12,8 +12,7 @@ with root priviledge.
 There are 2 executable binary dentakun and bentakun. dentakun is used to calculate polynomials using rational numbers.
 bentakun is used to calculate polynomials using boolean.
 
-To run it, give commands to a generated binary. For instance, execute following command to 
-calculate Groebner basis. Make sure you remove '$' when you type following commands.
+To run it, give commands to a generated binary. For instance, execute following command to calculate Groebner basis.
 ####################################
 echo 'f_1 = x^3 - 3x^2-x_1 + 1 \\
 f_2 = x_1^2 - x^2  - 1 \\
@@ -29,10 +28,13 @@ where <rule> is a integer between 0 to 255. You can specify Wolfram code through
 If you like to see how all ECDs works, you would like to do :
 	cd pics
 	./generator.sh
-It will create all ECDs whose Wolfram codes are 0 to 255. Additionaly, it makes gif image combining all ECDs.
+It will generate all ECDs whose Wolfram codes are 0 to 255. Additionaly, it makes gif image combining all ECDs.
+
+You can read more detailed document from index.html or 
+(I'm lazy, so it may not be detailed enough)
 
 This program is written for the lecture 'Seminar 1' of Department of Computer Science, Chiba Institude of Technology.
 
 To contact the one who wrote this program, you can send e-mail to s1731108gt@s.chibakoudai.jp or 
 send message to a Twitter account @Charcoal_gone. It is possible that the e-mail adress I mentioned
-be deleted when you are reading this. Therefore, sending message to my Twitter account is recommended.
+is deleted when you are reading this. Therefore, sending message to my Twitter account is recommended.

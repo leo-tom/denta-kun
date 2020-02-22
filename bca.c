@@ -25,6 +25,10 @@ along with Dentakun.  If not, see <http://www.gnu.org/licenses/>.
 #define EDGE_TYPE_REFLECTIVE (2)
 #define EDGE_TYPE_FIXED (3)
 
+#define BCA_TIME_INTERVAL (size)
+//#define BCA_TIME_INTERVAL (13824)
+
+
 char valueAt(char **buff,size_t size,int t,int i,int edge_type,char edge_value){
 	if(i < 0 || i >= size){
 		switch (edge_type){
@@ -88,13 +92,14 @@ char nextValue(char **buff,size_t size,int t,int index,Poly poly,int edge_type,c
 
 Poly _BCA(char **buff,size_t size,Poly poly,int edge_type,char edge_value){
 	int t,i;
-	for(t = 1;t < size;t++){
+	//koko
+	for(t = 1;t < BCA_TIME_INTERVAL;t++){
 		for(i = 0;i < size ;i++){
 			buff[t][i] = nextValue(buff,size,t,i,poly,edge_type,edge_value);
 		}
 	}
-	Poly *retval = malloc(sizeof(Poly)*size);
-	for(i = 0;i < size;i++){
+	Poly *retval = malloc(sizeof(Poly)*BCA_TIME_INTERVAL);
+	for(i = 0;i < BCA_TIME_INTERVAL;i++){
 		Poly *row = malloc(sizeof(Poly)*size);
 		Poly onePoly = polyDup(zeroPoly);
 		onePoly.ptr.items[0].coefficient = K_1;
@@ -108,13 +113,13 @@ Poly _BCA(char **buff,size_t size,Poly poly,int edge_type,char edge_value){
 		}
 		retval[i] = mkPolyArray(row,size);
 	}
-	return mkPolyArray(retval,size);
+	return mkPolyArray(retval,BCA_TIME_INTERVAL);
 }
 
 Poly BCA(Poly arg,BlackBoard blackboard){
 	Poly poly;
 	int i;
-	int edge_type = EDGE_TYPE_REFLECTIVE;
+	int edge_type = EDGE_TYPE_PERIODIC;
 	char edge_value = 0;
 	if(polyType(arg) != ARRAY){
 		poly = arg;
@@ -128,20 +133,20 @@ Poly BCA(Poly arg,BlackBoard blackboard){
 		}
 	}
 	Poly _tmp = findFromBlackBoard(blackboard,"BCA_PERIODIC",strlen("BCA_PERIODIC"));
-	if( !isNullPoly(_tmp) || !isZeroPoly(_tmp)){
+	if( !isNullPoly(_tmp) && !isZeroPoly(_tmp)){
 		edge_type = EDGE_TYPE_PERIODIC;
 		goto next;
 	}
 	_tmp = findFromBlackBoard(blackboard,"BCA_REFLECTIVE",strlen("BCA_REFLECTIVE"));
-	if( !isNullPoly(_tmp) || !isZeroPoly(_tmp)){
-		edge_type = EDGE_TYPE_PERIODIC;
+	if( !isNullPoly(_tmp) && !isZeroPoly(_tmp)){
+		edge_type = EDGE_TYPE_REFLECTIVE;
 		goto next;
 	}
 	_tmp = findFromBlackBoard(blackboard,"BCA_FIXED",strlen("BCA_FIXED"));
-	if( !isNullPoly(_tmp) || !isZeroPoly(_tmp)){
+	if( !isNullPoly(_tmp) && !isZeroPoly(_tmp)){
 		edge_type = EDGE_TYPE_FIXED;
 		_tmp = findFromBlackBoard(blackboard,"BCA_FIXED_VALUE",strlen("BCA_FIXED_VALUE"));
-		if(! isNullPoly(_tmp) || ! isZeroPoly(_tmp)){
+		if(! isNullPoly(_tmp) && ! isZeroPoly(_tmp)){
 			edge_value = 1;
 		}
 		goto next;
@@ -151,16 +156,16 @@ Poly BCA(Poly arg,BlackBoard blackboard){
 	if(polyType(_vector) != ARRAY){
 		fprintf(stderr,"BCA_INITIAL_STATE must be an array.");
 	}
-	size_t bca_size = polySize(_vector);
+	size_t size = polySize(_vector);
 	Poly *vector = unwrapPolyArray(_vector);
-	char **buff = malloc(sizeof(char *)*bca_size);
-	for(i = 0;i < bca_size;i++){
-		buff[i] = calloc(sizeof(char) , bca_size);
+	char **buff = malloc(sizeof(char *)*BCA_TIME_INTERVAL);
+	for(i = 0;i < BCA_TIME_INTERVAL;i++){
+		buff[i] = calloc(sizeof(char) , size);
 	}
-	for(i = 0;i < bca_size;i++){
+	for(i = 0;i < size;i++){
 		buff[0][i] = isZeroPoly(vector[i]) ? 0 : 1;
 	}
-	Poly retval = _BCA(buff,bca_size,poly,edge_type,edge_value);
+	Poly retval = _BCA(buff,size,poly,edge_type,edge_value);
 	return retval;
 }
 

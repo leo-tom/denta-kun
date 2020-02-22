@@ -14,6 +14,36 @@
 <body class="ALL">
 <h1>How to</h1>
 <h2>Basic syntax</h2>
+<h3>Basics</h3>
+<p>
+First, look at following code of Dentakun. It defines 3 polynomials. They are named f1,f2, and f3.
+You need to append "\\" each line to tell Dentakun that this is end of a line.
+Dentakun ignores newline character, so you can insert it anyware you want.
+<div style="text-align: left;"><span>
+f1 = x_2 x_1 x_0 - 1 \\ <br>
+f2 = (x_1+x_2) x_0+x_2 x_1 \\ <br>
+f3 = x_0+x_1+x_2 \\ <br>
+I = f1,f2,f3 \\ <br>
+I = \SRT(LEX,I) \\ <br>
+G = \BBA(I) \\ <br>
+\PP(G) \\  <br>
+</span></div>
+</p>
+<p>
+The 4th line of code defines "list" of polynomials with f1, f2, and f3. 5th line of code redefines variable "I" with
+return value of function "SRT". when you call function in Dentakun, you need to write "\" before the name of function.
+"SRT" function sorts a polynomial or all polynomials in the list. In this example, polynomials are sorted using Lexical order.
+There are 3 orders available : LEX, RLEX, PLEX. RLEX is reversed version of LEX. PLEX ignores degrees of polynomial and do
+"pure" lexical ordering. Note that LEX does care degree of each monomials when sorting.
+</p>
+<p>
+The 6th line of code calculates Groebner basis of I using Buchberger algorithm. 
+</p>
+<p>
+The 7th line of code prints out calculated Groebner basis. Usually, Dentakun print outs nothing unless a function "PP" is called.
+By the way, PP stands for "print polynomial". Also, PP is nickname for my girlfriend. I hope this relationship lasts for long so that
+I don't need to rewrite this document while suffering from regrets.
+</p>
 <h3>Variable</h3>
 <p>
 Use '=' to define constants. For instance, to make value of LEGALISE 420, do :
@@ -26,10 +56,21 @@ a_2 = 456 \\<br>
 </p>
 <p>
 You cannot use 'x' as name of constants you define. 'x' is used to define polynomial.
-You can make variables indexed using '_'. To specify degree of a variable, you use '^'.
+You can make variables indexed using '_'. To specify degree of a variable, use '^'.
 For example, definition of a unit circle would be :
 <div style="text-align: center;">circle = x^2 + x_1^2 - 1 \\</div>
 </p>
+
+<p>
+When you do not use '=' , say you just typed
+<div style="text-align: center;">x^2 + x_1^2 - 1 \\</div>
+the polynomial can be referenced from variable named "$n" where n is current line number. 
+</p>
+
+<p>
+There are some pre-defined variables. Here are list of it : 
+
+<p>
 
 <h1>What Denta-kun does inside</h1>
 <h2>Introduction</h2>

@@ -33,6 +33,8 @@ const char PRE_INCLUDE[] =
 	#endif
 	;
 
+
+
 BlackBoard readPreInclude(BlackBoard blackboard){
 	int fds[2];
 	if(pipe(fds)){
@@ -41,6 +43,10 @@ BlackBoard readPreInclude(BlackBoard blackboard){
 	int rfd = fds[0];
 	int wfd = fds[1];
 	write(wfd,PRE_INCLUDE,strlen(PRE_INCLUDE));
+	char *cmd = getenv("DENTAKUN_CMD");
+	if(cmd != NULL){
+		write(wfd,cmd,strlen(cmd));
+	}
 	close(wfd);
 	FILE *fp = fdopen(rfd,"r");
 	Definition definition = parser(fp,blackboard);

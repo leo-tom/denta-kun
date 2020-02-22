@@ -108,7 +108,7 @@ Poly builtIn_BBA(Poly array,BlackBoard blackboard){
 	}while(1);
 	return GrobnerBasis2ReducedGrobnerBasis(array);
 }
-Poly builtIn_SIM(Poly arg,BlackBoard blackboard){
+Poly builtIn_RED(Poly arg,BlackBoard blackboard){
 	if(polyType(arg) != ARRAY && polySize(arg) != 2){
 		DIE;
 	}
@@ -227,14 +227,14 @@ const Function BUILT_IN_FUNCS[] = {
 		.funcptr = builtIn_PPS
 	},
 	{
+		.name = "RED",
+		.description = "Reduce polynomial",
+		.funcptr = builtIn_RED
+	},
+	{
 		.name = "SP",
 		.description = "Calculate S polynomial",
 		.funcptr = builtIn_SP
-	},
-	{
-		.name = "SIM",
-		.description = "Calculate simplified polynomial",
-		.funcptr = builtIn_SIM
 	},
 	{
 		.name = "SRT",

@@ -36,7 +36,7 @@ fi
 
 if [ -z $SIZE ]
 then
-	SIZE='-1'
+	SIZE='256'
 fi
 if [ -z $SEED ]
 then
@@ -45,16 +45,15 @@ fi
 
 mkfifo $FIFO_FILE
 
+#to make picture huge, set size 13824 and rewrite code.
 if which magick > /dev/null
 then
 	echo "P1
-$SIZE $SIZE" | cat /dev/stdin $FIFO_FILE | magick convert pbm:- "out-$RULE.png" &
+$SIZE $SIZE" | cat /dev/stdin $FIFO_FILE | magick convert pbm:- $OUTFILE &
 else
 	echo "P1
-$SIZE $SIZE" | cat /dev/stdin $FIFO_FILE > "out-$RULE.pbm" &
+$SIZE $SIZE" | cat /dev/stdin $FIFO_FILE > $OUTFILE &
 fi
-
-
 
 awk -v "rule=$RULE" -v "size=$SIZE" -v "seed=$SEED" 'BEGIN{
 	if(size <= 0){
@@ -78,32 +77,41 @@ awk -v "rule=$RULE" -v "size=$SIZE" -v "seed=$SEED" 'BEGIN{
 		}
 		printf("%d \\\\\n",(rand()*10)%2);
 	}
-	print "f0 = 0 \\\\\n"
 	subscript = 0;
-	if(and(rule, 1)){
-		printf("f%d = 1 \\\\\n",subscript++);
-	}
-	for(i = 1;i < 8;i++){
+	for(i = 0;i < 8;i++){
 		if(and(rule,lshift(1,i))){
-			printf("f%d = (",subscript++);
+			printf("f%d = ",subscript++);
 			if(and(i , 2)){
-				printf("x_0 ");
+				printf("( x_0 + 0 )");
+			}else{
+				printf("( x_0 + 1 )");
 			}
 			if(and(i , 4)){
-				printf("x_1 ");
+				printf("( x_1 + 0 )");
+			}else{
+				printf("( x_1 + 1 )");
 			}
 			if(and(i , 1)){
-				printf("x_2 ");
+				printf("( x_2 + 0 )");
+			}else{
+				printf("( x_2 + 1 )");
 			}
-			printf("+ 1 ) + 1 \\\\\n");
+			printf("\\\\\n");
 		}
 	}
-	printf("f = ");
-	for(i = subscript - 1;i > 0;i--){
-		printf("f%d + ",i);
+	if(subscript == 0){
+		printf("f = 0 \\\\\n");
+	}else if(subscript == 1){
+		printf("f = f0 \\\\\n");
+	}else{
+		for(i = subscript - 2;i >= 0;i--){
+			printf("f%d = f%d + f%d + f%d f%d  \\\\\n",i,i,i+1,i,i+1);
+		}
+		printf("f = f0 \\\\\n" );
 	}
-	printf("f0 \\\\\n");
 	printf("\\PP(\\BCA(f)) \\\\\n");
+	#printf("\\PP(f) \\\\\n");
+	#printf("\\BCA(f) \\\\\n");
 }
 ' | bentakun | sed 'y/(),/   /; s/ //g ; /^$/d' >> $FIFO_FILE
 
