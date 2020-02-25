@@ -301,7 +301,6 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 		}
 		now = now->next;
 	}
-	
 	Poly retval = {
 		.ptr.items = malloc(sizeof(Item)) 
 		//For some reason, when I pass sizeof(Item) to malloc, allocated space get over written.
@@ -366,6 +365,12 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 			}
 			case Block:{
 				Poly p = _parser(*((Node **)&now->str),NULL,blackboard);
+				if(now->next == NULL && head == now){
+					polyFree(retval);
+					retval = p;
+					now = now->next;
+					break;
+				}
 				Poly tmp = polyMul(retval,p);
 				polyFree(p);
 				polyFree(retval);

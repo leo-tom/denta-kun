@@ -194,6 +194,54 @@ Poly builtIn_BCA(Poly arg,BlackBoard blackboard){
 	return BCA(arg,blackboard);
 }
 
+Poly builtIn_SUB(Poly arg,BlackBoard blackboard){
+	if(polyType(arg) != ARRAY || polySize(arg) < 2){
+		goto err;
+	}
+	Poly poly = unwrapPolyArray(arg)[0];
+	Poly __values = unwrapPolyArray(arg)[1];
+	Poly *_values;
+	size_t size;
+	if(polyType(__values) != ARRAY){
+		size = 1;
+		_values = &__values;
+	}else{
+		size = polySize(__values);
+		_values = unwrapPolyArray(__values);
+	}
+	int i,j,k;
+	K *values = malloc(sizeof(K)*size);
+	for(i = 0;i < size;i++){
+		copyK(values[i], poly2K(values[i],_values[i]));
+	}
+	K val;
+	copyK(val,K_0);
+	for(i = 0;i < polySize(poly);i++){
+		K tmp;
+		copyK(tmp,K_1);
+		for(j = 0;j < poly.ptr.items[i].size;j++){
+			if(poly.ptr.items[i].degrees[j]){
+				if(j >= size){
+					goto err;
+				}
+				for(k = 0;k < poly.ptr.items[i].degrees[j];k++){
+					mulK(tmp,tmp,values[j]);
+				}
+			}
+		}
+		addK(val,val,tmp);
+	}
+	
+	Poly retval = K2Poly(val,polyType(poly));
+	polyFree(arg);
+	free(values);
+	return retval;
+	err : 
+	fprintf(stderr,"builtIn_SUB expects 2 arrays as argument.\n");
+	fprintf(stderr,"...or, you did not give me enough values to substitute.\n");
+	DIE;
+}
+
 //ABCDEFGHIJKLMNOPQRSTUVWXYZ
 const Function BUILT_IN_FUNCS[] = {
 	{
@@ -245,6 +293,11 @@ const Function BUILT_IN_FUNCS[] = {
 		.name = "SSN",
 		.description = "Calculate standard notation.",
 		.funcptr = builtIn_SSN
+	},
+	{
+		.name = "SUB",
+		.description = "Substitute values",
+		.funcptr = builtIn_SUB
 	}
 	
 };

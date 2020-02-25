@@ -115,6 +115,7 @@ awk -v "rule=$RULE" -v "size=$SIZE" -v "seed=$SEED" 'BEGIN{
 }
 ' | bentakun | sed 'y/(),/   /; s/ //g ; /^$/d' >> $FIFO_FILE
 
+
 rm -f $FIFO_FILE
 
 

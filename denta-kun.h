@@ -191,6 +191,9 @@ Poly polyS(unmut Poly f,unmut Poly g);
 void polyNice(unmut Poly p);
 
 Poly K2Poly(mut K k,MonomialOrder order);
+#define poly2K(k,poly) (polyType(poly) == ARRAY || polySize(poly) != 1 || poly.ptr.items[0].size != 0) ? \
+		(fprintf(stderr, "Unable to call poly2K on : "),polyPrint(poly,K2str,stderr),fprintf(stderr,"\n"),exit(1),k) : \
+		copyK(k,poly.ptr.items[0].coefficient)
 int isZeroPoly(unmut Poly poly);
 N polyDegrees(unmut Poly p);
 Item __polyIn(unmut Poly poly);

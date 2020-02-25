@@ -168,6 +168,10 @@ Poly BCA(Poly arg,BlackBoard blackboard){
 		buff[0][i] = isZeroPoly(vector[i]) ? 0 : 1;
 	}
 	Poly retval = _BCA(buff,size,poly,edge_type,edge_value);
+	for(i = 0;i < BCA_TIME_INTERVAL;i++){
+		free(buff[i]);
+	}
+	free(buff);
 	return retval;
 }
 
