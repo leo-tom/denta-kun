@@ -409,7 +409,12 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 							N n;
 							switch(now->type){
 								case Block:{
-									Poly tmp = _parser(*((Node **)&now->str),NULL,blackboard);
+									Node *inside_block = *((Node **)&now->str);
+									if(inside_block->type == Number && inside_block->next == NULL){
+										n = (N)(atof(inside_block->str) + 0.5);
+										break;
+									}
+									Poly tmp = _parser(inside_block,NULL,blackboard);
 									n = (N)(poly2Double(tmp) + 0.5);
 									polyFree(tmp);
 								}break;

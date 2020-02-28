@@ -20,6 +20,7 @@ along with Dentakun.  If not, see <http://www.gnu.org/licenses/>.
 #include "denta-kun.h"
 
 FILE *OUTFILE = NULL;
+size_t SUBSHIFT = 0;
 
 const char PRE_INCLUDE[] = 
 	"LEX = 0 \\\\ RLEX = 1 \\\\ PLEX = 2\\\\"
@@ -64,6 +65,21 @@ BlackBoard readPreInclude(BlackBoard blackboard){
 int main(int argc,char *argv[]){
 	OUTFILE = stdout;
 	FILE *infile = stdin;
+	const char optstr[] = "s:";
+	opterr = 0;
+	int c;
+	while((c = getopt(argc,argv,optstr)) != -1){
+		switch(c){
+			case 's':
+			{
+				SUBSHIFT = atoi(optarg);
+			}break;
+			default:{
+				fprintf(stderr,"Unknow option : %c\n",c);
+				DIE;
+			}
+		}
+	}
 	initConst();
 	copyK(zeroPoly.ptr.items[0].coefficient,K_0);
 	BlackBoard blackboard = readPreInclude(mkBlackBoard());

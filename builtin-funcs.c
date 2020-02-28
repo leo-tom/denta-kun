@@ -55,7 +55,7 @@ Poly builtIn_PBB(Poly arg,BlackBoard blackboard){
 
 Poly builtIn_PP(Poly arg,BlackBoard blackboard){
 	polyPrint(arg,K2str,OUTFILE);
-	fprintf(OUTFILE,"\n");
+	fprintf(OUTFILE,"\\\\\n");
 	polyFree(arg);
 	return nullPoly;
 }
@@ -242,6 +242,17 @@ Poly builtIn_SUB(Poly arg,BlackBoard blackboard){
 	DIE;
 }
 
+extern Poly PAC(Poly arg,BlackBoard blackboard);
+
+Poly builtIn_PAC(Poly arg,BlackBoard blackboard){
+	#if !BOOLEAN
+	fprintf(stderr,"This function can be used only in boolean mode.");
+	DIE;
+	#endif
+	return PAC(arg,blackboard);
+}
+
+
 //ABCDEFGHIJKLMNOPQRSTUVWXYZ
 const Function BUILT_IN_FUNCS[] = {
 	{
@@ -258,6 +269,11 @@ const Function BUILT_IN_FUNCS[] = {
 		.name = "CLOCK",
 		.description = "Call clock() function.",
 		.funcptr = builtIn_CLOCK
+	},
+	{
+		.name = "PAC",
+		.description = "Convert array of polynomials to C code.",
+		.funcptr = builtIn_PAC
 	},
 	{
 		.name = "PBB",

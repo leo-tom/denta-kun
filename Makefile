@@ -5,7 +5,7 @@ DEBUG ?= 0
 DEBUGSTR != if [ $(DEBUG) -eq 1 ] ;  then  echo '-g -ggdb' ; else echo '-O2' ; fi;
 OPTS1 =  $(DEBUGSTR) -I/usr/local/include -Wall -DDEBUG=$(DEBUG) -DBOOLEAN=0
 OPTS2 =  $(DEBUGSTR) -I/usr/local/include -Wall -DDEBUG=$(DEBUG) -DBOOLEAN=1
-SRC = main.c parser.c poly-funcs.c black-board.c builtin-funcs.c K.c bca.c
+SRC = main.c parser.c poly-funcs.c black-board.c builtin-funcs.c K.c bca.c pac.c
 OBJ1 = $(SRC:%.c=%.o)
 OBJ2 = $(SRC:%.c=%.bo)
 headers = denta-kun.h
@@ -29,12 +29,15 @@ bentakun : $(OBJ2)
 install : all
 	install dentakun $(INSTALL_PATH)/bin/dentakun
 	install bentakun $(INSTALL_PATH)/bin/bentakun
-	install pbmaker.sh $(INSTALL_PATH)/bin/dentakun-bca-tool
+	install scripts/dentakun-tool.sh $(INSTALL_PATH)/bin/dentakun-tool
+	install -d $(INSTALL_PATH)/share/dentakun
+	cp -r scripts $(INSTALL_PATH)/share/dentakun/
 
 uninstall : 
 	$(RM) -f $(INSTALL_PATH)/bin/dentakun
 	$(RM) -f $(INSTALL_PATH)/bin/bentakun
-	$(RM) -f $(INSTALL_PATH)/bin/dentakun-bca-tool
+	$(RM) -f $(INSTALL_PATH)/bin/dentakun-tool
+	$(RM) -f $(INSTALL_PATH)/share/dentakun
 
 deinstall : uninstall
 

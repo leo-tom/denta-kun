@@ -17,16 +17,15 @@
 #along with Dentakun.  If not, see <http://www.gnu.org/licenses/>.
 #
 FIFO_FILE='_FIFO_PBMAKER_'
-RULE=1
+
+if [ -z $RULE ]
+then
+	RULE=1
+fi
+
 if [ $# -ge 1 ]
 then
 	RULE="$1"
-fi
-
-if [ $RULE -lt 0 -o $RULE -ge 256 ]
-then
-	echo 'Rule has to be a integer between 0 to 255.'
-	exit 1
 fi
 
 if [ -z $OUTFILE ]
@@ -55,10 +54,11 @@ else
 $SIZE $SIZE" | cat /dev/stdin $FIFO_FILE > $OUTFILE &
 fi
 
-awk -v "rule=$RULE" -v "size=$SIZE" -v "seed=$SEED" 'BEGIN{
+echo $(awk -v "size=$SIZE" -v "seed=$SEED" 'BEGIN{
 	if(size <= 0){
 		size = 256;
-	}else if(seed < 0){
+	}
+	if(seed < 0){
 		printf("BCA_INITIAL_STATE = ");
 		for(i = 0;i < size-1;i++){
 			if(i == size / 2){
@@ -68,8 +68,7 @@ awk -v "rule=$RULE" -v "size=$SIZE" -v "seed=$SEED" 'BEGIN{
 			}
 		}
 		printf("0 \\\\\n");
-	}
-	if(seed >= 0){
+	}else if(seed >= 0){
 		printf("BCA_INITIAL_STATE = ");
 		srand(seed);
 		for(i = 0;i < size-1;i++){
@@ -77,45 +76,8 @@ awk -v "rule=$RULE" -v "size=$SIZE" -v "seed=$SEED" 'BEGIN{
 		}
 		printf("%d \\\\\n",(rand()*10)%2);
 	}
-	subscript = 0;
-	for(i = 0;i < 8;i++){
-		if(and(rule,lshift(1,i))){
-			printf("f%d = ",subscript++);
-			if(and(i , 2)){
-				printf("( x_0 + 0 )");
-			}else{
-				printf("( x_0 + 1 )");
-			}
-			if(and(i , 4)){
-				printf("( x_1 + 0 )");
-			}else{
-				printf("( x_1 + 1 )");
-			}
-			if(and(i , 1)){
-				printf("( x_2 + 0 )");
-			}else{
-				printf("( x_2 + 1 )");
-			}
-			printf("\\\\\n");
-		}
-	}
-	if(subscript == 0){
-		printf("f = 0 \\\\\n");
-	}else if(subscript == 1){
-		printf("f = f0 \\\\\n");
-	}else{
-		for(i = subscript - 2;i >= 0;i--){
-			printf("f%d = f%d + f%d + f%d f%d  \\\\\n",i,i,i+1,i,i+1);
-		}
-		printf("f = f0 \\\\\n" );
-	}
-	printf("\\PP(\\BCA(f)) \\\\\n");
-	#printf("\\PP(f) \\\\\n");
-	#printf("\\BCA(f) \\\\\n");
 }
-' | bentakun | sed 'y/(),/   /; s/ //g ; /^$/d' >> $FIFO_FILE
-
-
+') 'f=' $(dentakun-tool function-maker $RULE) '\PP(\BCA(f)) \\' | bentakun | sed 'y/(),/   /; s/ //g ; /^$/d' >> $FIFO_FILE
 rm -f $FIFO_FILE
 
 

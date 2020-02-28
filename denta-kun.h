@@ -33,8 +33,6 @@ along with Dentakun.  If not, see <http://www.gnu.org/licenses/>.
 
 #define DIE do{fprintf(stderr,"%s [%d] : Can AIs die? What is difference between death and stop running on CPU?\n",__FILE__ , __LINE__);exit(1);}while(0)
 
-extern FILE *OUTFILE;
-
 #if !(RATIONAL || BOOLEAN)
 #define RATIONAL (1)
 #endif
@@ -54,6 +52,10 @@ typedef unsigned char Natural;
 
 typedef Numeric K;
 typedef Natural N;
+
+extern FILE *OUTFILE;
+extern size_t SUBSHIFT;
+
 extern K JOHO_NO_TANIGEN; //1
 extern K KAHO_NO_TANIGEN; //0
 extern K JOHO_NO_TANIGEN_NO_KAHO_NO_GYAKUGEN; //-1

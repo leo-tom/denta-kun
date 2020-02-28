@@ -208,13 +208,13 @@ void polyPrint(unmut Poly poly,char*(*printer)(K , char *),FILE *fp){
 				fprintf(fp," + %s ",printer(item.coefficient,buff));
 			}
 		}
-		int i;
+		size_t i;
 		for(i = 0; i < item.size;i++){
 			if(item.degrees[i]){
 				#if BOOLEAN
-				fprintf(fp,"x_{%d}^{%d} ",i,item.degrees[i]);
+				fprintf(fp,"x_{%ld}^{%d} ",i+SUBSHIFT,item.degrees[i]);
 				#else
-				fprintf(fp,"x_{%d}^{%ld} ",i,item.degrees[i]);
+				fprintf(fp,"x_{%ld}^{%ld} ",i+SUBSHIFT,item.degrees[i]);
 				#endif
 			}
 		}
