@@ -248,6 +248,16 @@ Poly polyIn(unmut Poly poly){
 	setPolyType(retval,order);
 	return retval;
 }
+int cmpItem(MonomialOrder order,Item v1,Item v2){
+	int (*cmp)(const Item *,const Item *) = NULL;
+	switch(order){
+		case LEX : {cmp = _polycmp_LEX;break;}
+		case RLEX : {cmp = _polycmp_RLEX;break;}
+		case PLEX : {cmp = _polycmp_PLEX;break;}
+		default   : { DIE;}
+	}
+	return cmp(&v1,&v2);
+}
 Poly polyAdd(unmut Poly v1,unmut Poly v2){
 	if(polyType(v1) != polyType(v2)){
 		fprintf(stderr,"Trying to add Poly sorted by different monomial order\n");

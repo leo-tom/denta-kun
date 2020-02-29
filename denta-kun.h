@@ -200,6 +200,7 @@ int isZeroPoly(unmut Poly poly);
 N polyDegrees(unmut Poly p);
 Item __polyIn(unmut Poly poly);
 Item _polyIn(unmut Poly poly);
+int cmpItem(MonomialOrder order,Item v1,Item v2);
 Poly polyIn(unmut Poly poly);
 Poly item2Poly(mut Item item);
 Poly polySort(unmut Poly poly,MonomialOrder order);
