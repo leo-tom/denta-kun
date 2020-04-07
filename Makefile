@@ -2,10 +2,10 @@
 
 INSTALL_PATH ?= /usr/local
 DEBUG ?= 0
-DEBUGSTR != if [ $(DEBUG) -eq 1 ] ;  then  echo '-g -ggdb' ; else echo '-O2' ; fi;
+DEBUGSTR != if [ $(DEBUG) -eq 1 ] ;  then  echo '-g -fsanitize=address -fno-omit-frame-pointer' ; else echo '-O2' ; fi;
 OPTS1 =  $(DEBUGSTR) -I/usr/local/include -Wall -DDEBUG=$(DEBUG) -DBOOLEAN=0
 OPTS2 =  $(DEBUGSTR) -I/usr/local/include -Wall -DDEBUG=$(DEBUG) -DBOOLEAN=1
-SRC = main.c parser.c poly-funcs.c black-board.c builtin-funcs.c K.c bca.c pac.c
+SRC = main.c parser.c poly-funcs.c black-board.c builtin-funcs.c K.c bca.c pac.c fgen.c
 OBJ1 = $(SRC:%.c=%.o)
 OBJ2 = $(SRC:%.c=%.bo)
 headers = denta-kun.h

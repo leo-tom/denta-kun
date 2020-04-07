@@ -103,8 +103,6 @@ Poly builtIn_BBA(Poly array,BlackBoard blackboard){
 		array.ptr.polies = realloc(array.ptr.polies,size * sizeof(Poly));
 		array.ptr.polies[size-1] = r;
 		setPolySize(array,size);
-		//array = removeUnnecessaryPolies(array);
-		//array = GrobnerBasis2ReducedGrobnerBasis(array);
 	}while(1);
 	return GrobnerBasis2ReducedGrobnerBasis(array);
 }
@@ -119,35 +117,38 @@ Poly builtIn_RED(Poly arg,BlackBoard blackboard){
 	return result;
 }
 Poly builtIn_SRT(Poly arg,BlackBoard blackboard){
-	if(polyType(arg) != ARRAY){
-		DIE;
+	Poly *array;
+	size_t size;
+	if(polyType(arg) == ARRAY){
+		array = unwrapPolyArray(arg);
+		size = polySize(arg);
+	}else{
+		polyFree(arg);
+		return nullPoly;
 	}
-	Poly *array = unwrapPolyArray(arg);
-	int64_t type = poly2Double(*array) + 0.5;
+	int64_t type = poly2Double(array[0]) + 0.5;
 	MonomialOrder order;
 	switch (type) {
 		case MONOMIAL_ORDER_IN_BIN__LEX: {order = LEX;break;}
 		case MONOMIAL_ORDER_IN_BIN__RLEX: {order = RLEX;break;}
 		case MONOMIAL_ORDER_IN_BIN__PLEX: {order = PLEX;break;}
 		default :{
-			fprintf(stderr,"Unknown type \"%ld\"\n",type);
+			fprintf(stderr,"Unknown monomial order \"%ld\"\n",type);
 			DIE;
 		}
 	}
 	size_t i;
-	size_t size = polySize(arg);
 	size--;
 	array++;
 	Poly *ptr = malloc(size * sizeof(Poly));
 	for(i = 0;i < size;i++){
-		Poly p = array[i];
-		ptr[i] = polySort(p,order);
+		ptr[i] = polySort(array[i],order);
 	}
-	Poly retval = nullPoly;
+	Poly retval;
 	if(size == 1){
 		retval = ptr[0];
 		free(ptr);
-	}else if (size > 1){
+	}else{
 		retval = mkPolyArray(ptr,size);
 	}
 	polyFree(arg);
@@ -183,19 +184,8 @@ Poly builtIn_CLOCK(Poly arg,BlackBoard blackboard){
 	return retval;
 	#endif
 }
-
-extern Poly BCA(Poly arg,BlackBoard blackboard);
-
-Poly builtIn_BCA(Poly arg,BlackBoard blackboard){
-	#if !BOOLEAN
-	fprintf(stderr,"This function can be used only in boolean mode.");
-	DIE;
-	#endif
-	return BCA(arg,blackboard);
-}
-
 Poly builtIn_SUB(Poly arg,BlackBoard blackboard){
-	if(polyType(arg) != ARRAY || polySize(arg) < 2){
+	if(polyType(arg) != ARRAY || polySize(arg) != 2){
 		goto err;
 	}
 	Poly poly = unwrapPolyArray(arg)[0];
@@ -219,12 +209,12 @@ Poly builtIn_SUB(Poly arg,BlackBoard blackboard){
 	for(i = 0;i < polySize(poly);i++){
 		K tmp;
 		copyK(tmp,K_1);
-		for(j = 0;j < poly.ptr.items[i].size;j++){
-			if(poly.ptr.items[i].degrees[j]){
+		for(j = 0;j < termSize(poly.ptr.terms[i]);j++){
+			if(termDegree(poly.ptr.terms[i],j)){
 				if(j >= size){
 					goto err;
 				}
-				for(k = 0;k < poly.ptr.items[i].degrees[j];k++){
+				for(k = 0;k < termDegree(poly.ptr.terms[i],j);k++){
 					mulK(tmp,tmp,values[j]);
 				}
 			}
@@ -240,6 +230,15 @@ Poly builtIn_SUB(Poly arg,BlackBoard blackboard){
 	fprintf(stderr,"builtIn_SUB expects 2 arrays as argument.\n");
 	fprintf(stderr,"...or, you did not give me enough values to substitute.\n");
 	DIE;
+}
+extern Poly BCA(Poly arg,BlackBoard blackboard);
+
+Poly builtIn_BCA(Poly arg,BlackBoard blackboard){
+	#if !BOOLEAN
+	fprintf(stderr,"This function can be used only in boolean mode.");
+	DIE;
+	#endif
+	return BCA(arg,blackboard);
 }
 
 extern Poly PAC(Poly arg,BlackBoard blackboard);

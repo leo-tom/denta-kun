@@ -31,7 +31,22 @@ along with Dentakun.  If not, see <http://www.gnu.org/licenses/>.
 #define mut
 #define unmut
 
-#define DIE do{fprintf(stderr,"%s [%d] : Can AIs die? What is difference between death and stop running on CPU?\n",__FILE__ , __LINE__);exit(1);}while(0)
+#define DIE do{fprintf(stderr,"Error at %s:%d\n",__FILE__ , __LINE__);exit(1);}while(0)
+
+#ifdef __GNUC__
+#define BUILTIN_POPCOUNT_EXISTS
+#endif
+#ifdef __clang__
+#define BUILTIN_POPCOUNT_EXISTS
+#endif
+
+#ifdef BUILTIN_POPCOUNT_EXISTS
+#define popcount(v) (sizeof(v) > 4 ? __builtin_popcountll(v) : __builtin_popcount(v))
+#endif
+
+#ifndef BUILTIN_POPCOUNT_EXISTS
+#error popcount not defined
+#endif
 
 #if !(RATIONAL || BOOLEAN)
 #define RATIONAL (1)
@@ -40,21 +55,23 @@ along with Dentakun.  If not, see <http://www.gnu.org/licenses/>.
 #if RATIONAL
 typedef mpq_t Q; 
 typedef Q Numeric;
-typedef int64_t Natural;
 #elif BOOLEAN
 typedef unsigned char B;
 typedef B Numeric;
-typedef unsigned char Natural;
 #else
 #error Nope. 
 #endif
 
+typedef uint64_t Natural;
 
 typedef Numeric K;
 typedef Natural N;
 
 extern FILE *OUTFILE;
 extern size_t SUBSHIFT;
+extern void *LOADED_FUNCTION_PTR;
+extern size_t LOADED_FUNCTION_INPUT_SIZE;
+extern size_t LOADED_FUNCTION_OUTPUT_SIZE;
 
 extern K JOHO_NO_TANIGEN; //1
 extern K KAHO_NO_TANIGEN; //0
@@ -64,11 +81,14 @@ void initConst();
 #define K_0 KAHO_NO_TANIGEN 
 #define K_N1 JOHO_NO_TANIGEN_NO_KAHO_NO_GYAKUGEN
 
+
+//Free return value of these 2.
+char * K2str(K k);
+char * K2strScientific(K k);
+
 #if RATIONAL
 
 void str2K(K val,const char *str);
-char * K2str(K k,char *buff);
-char * K2strScientific(K k,char *buff);
 void addK(K val,const K v1,const K v2);
 void subK(K val,const K v1,const K v2);
 void mulK(K val,const K v1,const K v2);
@@ -80,16 +100,14 @@ void divK(K val,const K v1,const K v2);
 #define initK(k) (mpq_init(k),k)
 
 #elif BOOLEAN
-char * K2str(K k,char *buff);
-char * K2strScientific(K k,char *buff);
 #define addK(val,v1,v2) (val = (v1 & 0x1) ^ (v2 & 0x1))
 #define subK(val,v1,v2) (val = (v1 & 0x1) ^ (v2 & 0x1))
 #define mulK(val,v1,v2) (val = (v1 & v2) & 0x1)
 #define divK(val,v1,v2) (val = v1 / v2 )
-#define str2K(val,str) ( (atoi(str)%2) ? (val = 1) : (val = 0) )
+#define str2K(val,str) ( atoi(str) ? (val = 1) : (val = 0) )
 #define K2double(k) ((double) k)
 #define cmpK(v1,v2) (v1 == v2 ? 0 : (v1 > v2 ? 1 : -1))
-#define freeK(k)
+#define freeK(k) (0)
 #define copyK(to,from) (to = from)
 #define initK(k) (k=0)
 
@@ -101,14 +119,18 @@ typedef enum _MonomialOrder{
 	LEX,
 	RLEX,
 	PLEX,
+	PRLEX,
 	ARRAY
 }MonomialOrder;
 
 typedef struct{
-	size_t size;
+	size_t sizu; 
 	K coefficient;
-	N *degrees;
-}Item;
+	union{
+		N *ptr;
+		N val;
+	}deg;
+}Term;
 
 typedef struct __Poly__{
 	/*Assume size_t is 64 bit long. If not, this is not gonna work.*/
@@ -116,7 +138,7 @@ typedef struct __Poly__{
 	/*upper 4 bits are used to store monomial order that is used in this Poly.*/
 	size_t size;
 	union{
-		Item *items;
+		Term *terms;
 		struct __Poly__ *polies;
 	}ptr;
 }Poly;
@@ -124,18 +146,50 @@ typedef struct __Poly__{
 #define MONOMIAL_ORDER_IN_BIN__LEX (0)
 #define MONOMIAL_ORDER_IN_BIN__RLEX (1)
 #define MONOMIAL_ORDER_IN_BIN__PLEX (2)
-#define MONOMIAL_ORDER_IN_BIN__ARRAY (3)
+#define MONOMIAL_ORDER_IN_BIN__PRLEX (3)
+#define MONOMIAL_ORDER_IN_BIN__ARRAY (4)
 
 void _setPolySize(Poly *poly,size_t size);
 void _setPolyType(Poly *poly,MonomialOrder);
 
 #define polySize(p) ((p).size & 0xfffffffffffffff)
-#define polyType(p) (((p).size >> 60) == MONOMIAL_ORDER_IN_BIN__RLEX ? RLEX : \
-					 (((p).size >> 60) == MONOMIAL_ORDER_IN_BIN__PLEX ? PLEX : ( \
-					  ((p).size >> 60) == MONOMIAL_ORDER_IN_BIN__LEX ? LEX : ARRAY)))
+#define polyType(p) ((p).size >> 60 == MONOMIAL_ORDER_IN_BIN__RLEX ? RLEX : ( \
+					 (p).size >> 60 == MONOMIAL_ORDER_IN_BIN__PLEX ? PLEX : ( \
+					 (p).size >> 60 == MONOMIAL_ORDER_IN_BIN__PRLEX ? PRLEX : ( \
+					 (p).size >> 60 == MONOMIAL_ORDER_IN_BIN__LEX ? LEX : ARRAY))))
 
 #define setPolySize(polynomial,newSize) _setPolySize(&polynomial,newSize)
 #define setPolyType(polynomial,typeToBeSet) _setPolyType(&polynomial,typeToBeSet)
+
+#if BOOLEAN
+#define termSize(term) (term.sizu)
+#define termFree(term) ((term.sizu <= sizeof(N)*8) ? (term.deg.val = 0) : (free(term.deg.ptr), freeK(term.coefficient),0))
+#define termDegree(term,index) ((term.sizu <= sizeof(N)*8) \
+									? ((term.deg.val >> index) & 0x1) \
+									: (N)((term.deg.ptr[index/(sizeof(N)*8)] >> (index % (sizeof(N)*8))) & 0x1))
+#define termDegreeAllocator(term) ((term.sizu <= sizeof(N)*8) ? (term.deg.val = 0,NULL) \
+									: (term.deg.ptr = calloc(sizeof(N),(term.sizu-1)/(sizeof(N)*8) + 1)))
+#define setTermDegree(term,index,value) (value ? \
+											((term.sizu <= sizeof(N)*8) \
+												? (term.deg.val |= (1 << index))\
+												: (term.deg.ptr[index/(sizeof(N)*8)] |= (1 << (index % (sizeof(N)*8)))) \
+											)\
+											:((term.sizu <= sizeof(N)*8) \
+												? (term.deg.val &= ~(1 << index))\
+												: ((term.deg.ptr[index/(sizeof(N)*8)] &= (~(1 << (index % (sizeof(N)*8)))))) \
+											))
+											
+#define setTermSize(term,size) (term.sizu = size)
+#elif RATIONAL
+#define termSize(term) (term.sizu)
+#define termDegree(term,index) (term.deg.ptr[index])
+#define termDegreeAllocator(term) (term.deg.ptr = calloc(sizeof(N),term.sizu))
+#define termFree(term) (free(term.deg.ptr),freeK(term.coefficient),0)
+#define setTermDegree(term,index,value) (term.deg.ptr[index] = value)
+#define setTermSize(term,size) (term.sizu = size)
+#else
+#error Nope.
+#endif
 
 
 #define DEFINITION_BYTES_SIZE (16)
@@ -163,10 +217,11 @@ extern const Function BUILT_IN_FUNCS[];
 extern const size_t BUILT_IN_FUNC_SIZE;
 
 Poly callBuiltInFunc(const char *name,Poly arg,BlackBoard blackboard);
+Poly cfunc2Poly(size_t inputSize,size_t outputSize,BlackBoard blackboard);
 
 extern const Poly nullPoly;
-extern const Poly zeroPoly;
-extern const Definition nullDefinition;
+extern Poly zeroPoly;
+extern Definition nullDefinition;
 int isNullPoly(unmut Poly poly);
 int isNullDefinition(unmut Definition definition);
 
@@ -179,7 +234,8 @@ BlackBoard insert2BlackBoard(mut BlackBoard blackboard,mut Definition def);
 BlackBoard sortBlackBoard(mut BlackBoard blackboard);
 Poly findFromBlackBoard(unmut BlackBoard blackboard,const char *name,size_t nameSize);
 
-Definition parser(FILE *stream,BlackBoard blackboard);
+Poly parser(FILE *stream,BlackBoard *blackboard);
+Poly instantParser(char *code,BlackBoard *blackboard);
 
 /*following functions takes Poly expected to be already sorted by same monomial order*/
 Poly polyAdd(unmut Poly v1,unmut Poly v2);
@@ -193,19 +249,20 @@ Poly polyS(unmut Poly f,unmut Poly g);
 void polyNice(unmut Poly p);
 
 Poly K2Poly(mut K k,MonomialOrder order);
-#define poly2K(k,poly) (polyType(poly) == ARRAY || polySize(poly) != 1 || poly.ptr.items[0].size != 0) ? \
+#define poly2K(k,poly) ((polyType(poly) == ARRAY || polySize(poly) != 1 || termSize(poly.ptr.terms[0]) != 0) ? \
 		(fprintf(stderr, "Unable to call poly2K on : "),polyPrint(poly,K2str,stderr),fprintf(stderr,"\n"),exit(1),k) : \
-		copyK(k,poly.ptr.items[0].coefficient)
+		copyK(k,poly.ptr.terms[0].coefficient))
 int isZeroPoly(unmut Poly poly);
 N polyDegrees(unmut Poly p);
-Item __polyIn(unmut Poly poly);
-Item _polyIn(unmut Poly poly);
-int cmpItem(MonomialOrder order,Item v1,Item v2);
+Term __polyIn(unmut Poly poly);
+Term _polyIn(unmut Poly poly);
+Term dupTerm(unmut Term);
+int cmpTerm(MonomialOrder order,Term v1,Term v2);
 Poly polyIn(unmut Poly poly);
-Poly item2Poly(mut Item item);
+Poly term2Poly(mut Term);
 Poly polySort(unmut Poly poly,MonomialOrder order);
-void polyPrint(unmut Poly poly,char*(*printer)(K , char *),FILE *fp);
-Poly appendItem2Poly(mut Poly poly,mut Item item);
+void polyPrint(unmut Poly poly,char*(*printer)(K ),FILE *fp);
+//Poly appendTerm2Poly(mut Poly poly,mut Term);
 double poly2Double(unmut Poly poly);
 Poly polyDup(unmut Poly poly);
 void polyFree(mut Poly v);

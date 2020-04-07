@@ -19,12 +19,8 @@ along with Dentakun.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "denta-kun.h"
 
-const Definition nullDefinition = {
+Definition nullDefinition = {
 	.bytes = {0},
-	.poly =	{
-		.size = -1,
-		.ptr.items = NULL
-	},
 };
 
 int isNullDefinition(unmut Definition definition){
@@ -37,7 +33,8 @@ BlackBoard mkBlackBoard(){
 	retval.capacity = 8;
 	retval.array = malloc(sizeof(Definition)*retval.capacity);
 	retval.size = 0;
-	return retval;
+	retval = insert2BlackBoard(retval,mkDefinition("null",strlen("null"),nullPoly));
+	return insert2BlackBoard(retval,mkDefinition("NULL",strlen("NULL"),nullPoly));
 }
 
 void printBlackBoard(BlackBoard blackboard,FILE *fp){

@@ -42,24 +42,29 @@ then
 	SEED='-1'
 fi
 
+if [ -z $DENSITY ]
+then
+	DENSITY=50
+fi
+
 mkfifo $FIFO_FILE
 
 #to make picture huge, set size 13824 and rewrite code.
-if which magick > /dev/null
+if which convert > /dev/null
 then
 	echo "P1
-$SIZE $SIZE" | cat /dev/stdin $FIFO_FILE | magick convert pbm:- $OUTFILE &
+$SIZE $SIZE" | cat /dev/stdin $FIFO_FILE | convert pbm:- png:$OUTFILE &
 else
 	echo "P1
 $SIZE $SIZE" | cat /dev/stdin $FIFO_FILE > $OUTFILE &
 fi
 
-echo $(awk -v "size=$SIZE" -v "seed=$SEED" 'BEGIN{
+echo $(awk -v "density=$DENSITY" -v "size=$SIZE" -v "seed=$SEED" 'BEGIN{
 	if(size <= 0){
 		size = 256;
 	}
 	if(seed < 0){
-		printf("BCA_INITIAL_STATE = ");
+		printf("BCA_INITIAL_STATE = (");
 		for(i = 0;i < size-1;i++){
 			if(i == size / 2){
 				printf("1,");
@@ -67,17 +72,25 @@ echo $(awk -v "size=$SIZE" -v "seed=$SEED" 'BEGIN{
 				printf("0,");
 			}
 		}
-		printf("0 \\\\\n");
+		printf("0) \\\\\n");
 	}else if(seed >= 0){
-		printf("BCA_INITIAL_STATE = ");
+		printf("BCA_INITIAL_STATE = (");
 		srand(seed);
 		for(i = 0;i < size-1;i++){
-			printf("%d,",(rand()*10)%2);
+			if((rand()*1000)%100 >= density){
+				printf("0,");
+			}else{
+				printf("1,");
+			}
 		}
-		printf("%d \\\\\n",(rand()*10)%2);
+		if((rand()*1000)%100 >= density){
+			printf("0) \\\\\n");
+		}else{
+			printf("1) \\\\\n");
+		}
 	}
 }
-') 'f=' $(dentakun-tool function-maker $RULE) '\PP(\BCA(f)) \\' | bentakun | sed 'y/(),/   /; s/ //g ; /^$/d' >> $FIFO_FILE
+') 'f=' $(dentakun-tool function-maker $RULE) '\PP(\BCA(f)) \\' | bentakun | sed 'y/(),/   /; s/ //g ; s/\\//g ; /^$/d ' > $FIFO_FILE
 rm -f $FIFO_FILE
 
 

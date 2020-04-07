@@ -78,6 +78,5 @@ awk -v "VARIABLE_SIZE=$VARIABLE_SIZE" -v "NUMBER=$NUMBER" 'BEGIN{
 	}
 	printf("\\PP(f) \\\\\n");
 }
-' 
-#| bentakun -s $SUBSHIFT > $OUTFILE
+' | bentakun -s $SUBSHIFT > $OUTFILE
 

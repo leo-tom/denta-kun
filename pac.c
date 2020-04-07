@@ -39,18 +39,6 @@ typedef struct{
 	Operation op;
 }Instruction;
 
-uint64_t popcnt(uint64_t n)
-{
-    uint64_t c = 0;
-    c = (n & 0x5555555555555555) + ((n>>1) & 0x5555555555555555);
-    c = (c & 0x3333333333333333) + ((c>>2) & 0x3333333333333333);
-    c = (c & 0x0f0f0f0f0f0f0f0f) + ((c>>4) & 0x0f0f0f0f0f0f0f0f);
-    c = (c & 0x00ff00ff00ff00ff) + ((c>>8) & 0x00ff00ff00ff00ff);
-    c = (c & 0x0000ffff0000ffff) + ((c>>16) & 0x0000ffff0000ffff);
-    c = (c & 0x00000000ffffffff) + ((c>>32) & 0x00000000ffffffff);
-    return(c);
-}
-
 Container * PAC_AND(uint64_t *targets,size_t targetSize,size_t inputSize,size_t outputSize){
 	int i,j;
 	Container *container = NULL;
@@ -67,7 +55,7 @@ Container * PAC_AND(uint64_t *targets,size_t targetSize,size_t inputSize,size_t 
 	}
 	size_t currentSize = targetSize;
 	for(i = 0;i < targetSize;i++){
-		if(popcnt(targets[i]) == 1){
+		if(popcount(targets[i]) == 1){
 			targets[i] = 0;
 			currentSize--;
 		}
@@ -100,7 +88,7 @@ Container * PAC_AND(uint64_t *targets,size_t targetSize,size_t inputSize,size_t 
 						}else{
 							int64_t positive = targets[i] & newVal[j];
 							int64_t negative = ( ~ targets[i] ) & newVal[j];
-							_okScore += popcnt(positive) - popcnt(negative); 
+							_okScore += popcount(positive) - popcount(negative); 
 						}
 					}
 				}
@@ -157,11 +145,11 @@ Container * PAC_AND(uint64_t *targets,size_t targetSize,size_t inputSize,size_t 
 	return container;
 }
 
-uint64_t item2uint64_t(Item item){
+uint64_t term2uint64_t(Term term){
 	int i;
 	uint64_t retval = 0;
-	for(i = 0;i < item.size;i++){
-		if(item.degrees[i]){
+	for(i = 0;i < termSize(term);i++){
+		if(termDegree(term,i)){
 			retval |= 1 << i;
 		}
 	}
@@ -174,28 +162,32 @@ void printAllContainers(Container *container,size_t inputSize){
 	}
 	printAllContainers(container->next,inputSize);
 	if(container->instruction == NULL){
-		fprintf(OUTFILE,"\tchar v%d = (v << %d) | (v >> %ld);\n",container->number,container->number,inputSize - container->number);
+		fprintf(OUTFILE,"\tconst uint64_t v%d = (v << %d) | (v >> %ld);\n",container->number,container->number,inputSize - container->number);
 	}else{
-		fprintf(OUTFILE,"\tchar v%d = v%d & v%d;\n"
+		fprintf(OUTFILE,"\tconst uint64_t v%d = v%d & v%d;\n"
 		,container->number,((Instruction *)container->instruction)->c1->number,((Instruction *)container->instruction)->c2->number);
 	}
 }
 
 Poly PAC(Poly arg,BlackBoard blackboard){
-	if(polyType(arg) != ARRAY || polySize(arg) != 8){
-		polyPrint(arg,K2str,stderr);
-		fprintf(stderr," is invalid as argument of PAC.\n");
+	if(polyType(arg) != ARRAY){
+		fprintf(stderr,"PAC expects array whose size is 2^n.\n");
+		DIE;
 	}
 	int64_t i,j,k;
 	Poly *array = unwrapPolyArray(arg);
 	size_t termsSize = 0;
 	size_t inputSize = 0;
 	size_t outputSize = polySize(arg);
+	if(popcount(outputSize) != 1 || outputSize == 1){
+		fprintf(stderr,"PAC expects array whose size is 2^n. But is %lu\n",outputSize);
+		DIE;
+	}
 	for(i = 0;i < outputSize;i++){
 		termsSize += polySize(array[i]);
 		for(j = 0;j < polySize(array[i]);j++){
-			if(array[i].ptr.items[j].size > inputSize){
-				inputSize = array[i].ptr.items[j].size;
+			if(termSize(array[i].ptr.terms[j]) > inputSize){
+				inputSize = termSize(array[i].ptr.terms[j]);
 			}
 		}
 	}
@@ -205,48 +197,64 @@ Poly PAC(Poly arg,BlackBoard blackboard){
 	size_t termsIndex = 0;
 	MonomialOrder order = polyType(array[0]);
 	while(remaining > 0){
-		Item biggestItem;
+		Term biggestTerm;
 		int first = 1;
 		for(i = 0;i < outputSize;i++){
 			if(indexes[i] >= polySize(array[i])){
 				continue;
 			}
 			if(first){
-				biggestItem = array[i].ptr.items[indexes[i]];
+				biggestTerm = array[i].ptr.terms[indexes[i]];
 				first = 0;
-			}else if(cmpItem(order,biggestItem,array[i].ptr.items[indexes[i]]) < 0){
-				biggestItem = array[i].ptr.items[indexes[i]];
+			}else if(cmpTerm(order,biggestTerm,array[i].ptr.terms[indexes[i]]) < 0){
+				biggestTerm = array[i].ptr.terms[indexes[i]];
 			}
 		}
 		for(i = 0;i < outputSize;i++){
 			if(indexes[i] >= polySize(array[i])){
 				continue;
 			}
-			if(cmpItem(order,biggestItem,array[i].ptr.items[indexes[i]]) == 0){
+			if(cmpTerm(order,biggestTerm,array[i].ptr.terms[indexes[i]]) == 0){
 				if((++indexes[i]) >= polySize(array[i])){
 					remaining--;
 				}
 			}
 		}
-		terms[termsIndex++] = item2uint64_t(biggestItem);
+		if(termSize(biggestTerm) != 0){
+			terms[termsIndex++] = term2uint64_t(biggestTerm);
+		}
 	}
 	Container *container = PAC_AND(terms,termsIndex,inputSize,outputSize);
 	free(terms);
-	fprintf(OUTFILE,"char functionName(char v){\n");
+	fprintf(OUTFILE,"uint64_t functionName(uint64_t v){\n");
+	for(i = 0;i < outputSize;i++){
+		fprintf(OUTFILE,"/*\nf%ld = ",i);
+		polyPrint(array[i],K2str,OUTFILE);
+		fprintf(OUTFILE,"\\\\\n*/\n");
+	}
 	printAllContainers(container,inputSize);
 	fprintf(OUTFILE,"\treturn ");
 	for(i = 0;i < outputSize;i++){
 		Poly poly = array[i];
 		fprintf(OUTFILE,"((");
 		for(j = 0;j < polySize(poly);j++){
-			Item item = poly.ptr.items[j];
-			uint64_t itemValue = item2uint64_t(item);
+			Term term = poly.ptr.terms[j];
+			if(termSize(term) == 0){
+				//constant term
+				if(!cmpK(term.coefficient,K_1)){
+					fprintf(OUTFILE,"(1 << %ld)) & (1 << %ld))",i,i);
+				}else{
+					fprintf(OUTFILE,"0) & (1 << %ld))",i);
+				}
+				continue;
+			}
+			uint64_t termValue = term2uint64_t(term);
 			Container *now = container;
 			Container *useThis = NULL;
 			int64_t nthBit;
 			while(now){
 				for(k = 0;k < inputSize;k++){
-					if(now->values[k] == itemValue){
+					if(now->values[k] == termValue){
 						if(k == i){
 							useThis = now;
 							nthBit = k;
@@ -263,9 +271,9 @@ Poly PAC(Poly arg,BlackBoard blackboard){
 				DIE;
 			}
 			done:
-			if((i - nthBit) < 0){
+			if(i < nthBit){
 				fprintf(OUTFILE,"(v%d >> %ld)",useThis->number,nthBit - i);
-			}else if((i - nthBit) > 0){
+			}else if(i > nthBit){
 				fprintf(OUTFILE,"(v%d << %ld)",useThis->number,i - nthBit);
 			}else{
 				fprintf(OUTFILE,"v%d",useThis->number);
@@ -273,11 +281,11 @@ Poly PAC(Poly arg,BlackBoard blackboard){
 			if(j + 1 == polySize(poly)){
 				fprintf(OUTFILE,") & (1 << %ld))",i);
 			}else{
-				fprintf(OUTFILE,"^");
+				fprintf(OUTFILE," ^ ");
 			}
 		}
 		if(i + 1 != outputSize){
-			fprintf(OUTFILE,"|");
+			fprintf(OUTFILE,"\n\t\t|");
 		}
 	}
 	fprintf(OUTFILE,";\n}\n");

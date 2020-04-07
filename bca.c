@@ -25,9 +25,7 @@ along with Dentakun.  If not, see <http://www.gnu.org/licenses/>.
 #define EDGE_TYPE_REFLECTIVE (2)
 #define EDGE_TYPE_FIXED (3)
 
-#define BCA_TIME_INTERVAL (size)
-//#define BCA_TIME_INTERVAL (13824)
-
+size_t BCA_TIME_INTERVAL = 256;
 
 char valueAt(char **buff,size_t size,int t,int i,int edge_type,char edge_value){
 	if(i < 0 || i >= size){
@@ -60,11 +58,11 @@ char nextValue(char **buff,size_t size,int t,int index,Poly poly,int edge_type,c
 	char retval = K_0;
 	int i,j;
 	for(i = 0;i < polySize(poly);i++){
-		if(!cmpK(poly.ptr.items[i].coefficient,K_0)){
+		if(!cmpK(poly.ptr.terms[i].coefficient,K_0)){
 			continue;
 		}
-		for(j = 0;j < poly.ptr.items[i].size;j++){
-			if(poly.ptr.items[i].degrees[j]){
+		for(j = 0;j < termSize(poly.ptr.terms[i]);j++){
+			if(termDegree(poly.ptr.terms[i],j)){
 				if(j == 0){
 					if(!valueAt(buff,size,t-1,index,edge_type,edge_value)){
 						goto zero;
@@ -102,7 +100,7 @@ Poly _BCA(char **buff,size_t size,Poly poly,int edge_type,char edge_value){
 	for(i = 0;i < BCA_TIME_INTERVAL;i++){
 		Poly *row = malloc(sizeof(Poly)*size);
 		Poly onePoly = polyDup(zeroPoly);
-		onePoly.ptr.items[0].coefficient = K_1;
+		copyK(onePoly.ptr.terms[0].coefficient,K_1);
 		int j;
 		for(j = 0;j < size;j++){
 			if(buff[i][j]){
@@ -124,13 +122,8 @@ Poly BCA(Poly arg,BlackBoard blackboard){
 	if(polyType(arg) != ARRAY){
 		poly = arg;
 	}else{
-		Poly *array = unwrapPolyArray(arg);
-		poly = polyDup(array[0]);
-		for(i = 1;i < polySize(arg);i++){
-			Poly tmp = polyAdd(poly,array[i]);
-			polyFree(poly);
-			poly = tmp;
-		}
+		fprintf(stderr,"Not supported yet\n");
+		DIE;
 	}
 	Poly _tmp = findFromBlackBoard(blackboard,"BCA_PERIODIC",strlen("BCA_PERIODIC"));
 	if( !isNullPoly(_tmp) && !isZeroPoly(_tmp)){
@@ -160,6 +153,9 @@ Poly BCA(Poly arg,BlackBoard blackboard){
 	}
 	size_t size = polySize(_vector);
 	Poly *vector = unwrapPolyArray(_vector);
+	if(BCA_TIME_INTERVAL < size){
+		BCA_TIME_INTERVAL = size;
+	}
 	char **buff = malloc(sizeof(char *)*BCA_TIME_INTERVAL);
 	for(i = 0;i < BCA_TIME_INTERVAL;i++){
 		buff[i] = calloc(sizeof(char) , size);

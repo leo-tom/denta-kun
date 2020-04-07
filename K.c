@@ -21,21 +21,35 @@ along with Dentakun.  If not, see <http://www.gnu.org/licenses/>.
 K JOHO_NO_TANIGEN;
 K KAHO_NO_TANIGEN;
 K JOHO_NO_TANIGEN_NO_KAHO_NO_GYAKUGEN;
-#if RATIONAL
 void initConst(){
-	initK(JOHO_NO_TANIGEN);
-	initK(KAHO_NO_TANIGEN);
-	initK(JOHO_NO_TANIGEN_NO_KAHO_NO_GYAKUGEN);
-	mpq_set_si(JOHO_NO_TANIGEN,1,1);
-	mpq_set_si(KAHO_NO_TANIGEN,0,1);
-	mpq_set_si(JOHO_NO_TANIGEN_NO_KAHO_NO_GYAKUGEN,-1,1);
+#if BOOLEAN
+	K_1 = 1;
+	K_0 = 0;
+	K_N1 = 1;
+#elif RATIONAL
+	initK(K_1);
+	initK(K_0);
+	initK(K_N1);
+	mpq_set_si(K_1,1,1);
+	mpq_set_si(K_0,0,1);
+	mpq_set_si(K_N1,-1,1);
+#else
+#error Nope.
+#endif
+	nullDefinition.poly = nullPoly;
+	zeroPoly.ptr.terms = malloc(sizeof(Term));
+	setTermSize(zeroPoly.ptr.terms[0],0);
+	termDegreeAllocator(zeroPoly.ptr.terms[0]);
+	copyK(zeroPoly.ptr.terms[0].coefficient,K_0);
 }
+#if RATIONAL
 void str2K(K val,const char *str){
 	mpq_init(val);
 	mpq_set_d(val,atof(str));
 }
-char * K2str(K k,char *buff){
+char * K2str(K k){
 	char *__buff = mpq_get_str(NULL,10,k);
+	char *buff = malloc(strlen(__buff)+16);
 	char *slash = strchr(__buff,'/');
 	if(slash == NULL){
 		strcpy(buff,__buff);
@@ -47,10 +61,10 @@ char * K2str(K k,char *buff){
 	free(__buff);
 	return buff;
 }
-char * K2strScientific(K k,char *buff){
-    char *str = buff;
+char * K2strScientific(K k){
+    char *buff = malloc(64);
     sprintf(buff,"%e",mpq_get_d(k));
-    return str;
+    return buff;
 }
 
 void addK(K val,const K v1,const K v2){
@@ -87,12 +101,8 @@ K _v1,_v2;
 }
 
 #elif BOOLEAN
-void initConst(){
-	K_1 = 1;
-	K_0 = 0;
-	K_N1 = 1;
-}
-char * K2str(K k,char *buff){
+char * K2str(K k){
+	char *buff = malloc(2);
 	if(k){
 		buff[0] = '1';
 	}else{
@@ -101,8 +111,8 @@ char * K2str(K k,char *buff){
 	buff[1] = 0;
 	return buff;
 }
-char * K2strScientific(K k,char *buff){
-    return K2str(k,buff);
+char * K2strScientific(K k){
+    return K2str(k);
 }
 #else
 #error Nope.

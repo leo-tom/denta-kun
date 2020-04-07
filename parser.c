@@ -18,8 +18,6 @@ along with Dentakun.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include "denta-kun.h"
 
-extern Item _copyItem(unmut Item item);
-
 int getNextChar(FILE *stream){
 	int c;
 	while((c = fgetc(stream))!=EOF){
@@ -42,7 +40,7 @@ enum NodeType {
 	Block,
 };
 
-#define NODE_STR_SIZE (64)
+#define NODE_STR_SIZE (128)
 typedef struct _Node{
 	enum NodeType type;
 	char str[NODE_STR_SIZE];
@@ -144,33 +142,22 @@ Node * __parser(FILE *stream){
 					char _buff[NODE_STR_SIZE] = {0};
 					char *buff = _buff;
 					*buff++ = c;
-					while(isdigit(c = getNextChar(stream)) || c == '.' ){
+					while(isdigit(c = fgetc(stream)) || c == '.' ){
 						*buff++ = c;
 					}
 					ungetc(c,stream);
 					*buff = 0;
 					append(head,butt,number,_buff);
 				}else if(isalpha(c)){
-					if(c == 'x'){
-						int tmp = fgetc(stream);
-						ungetc(tmp,stream);
-						if(!isalpha(tmp)){
-							char buff[NODE_STR_SIZE];
-							buff[0] = c; buff[1] = 0;
-							append(head,butt,variable,buff);
-							break;
-						}
-					}else{
-						char _buff[NODE_STR_SIZE] = {0};
-						char *buff = _buff;
+					char _buff[NODE_STR_SIZE] = {0};
+					char *buff = _buff;
+					*buff++ = c;
+					while(isalpha(c = fgetc(stream)) || isdigit(c)){
 						*buff++ = c;
-						while(isalpha(c = fgetc(stream)) || c == '_' || isdigit(c)){
-							*buff++ = c;
-						}
-						ungetc(c,stream);
-						*buff = 0;
-						append(head,butt,variable,_buff);
 					}
+					ungetc(c,stream);
+					*buff = 0;
+					append(head,butt,variable,_buff);
 				}else{
 					fprintf(stderr,"Unknown char\'%c\'[%x]\n",c,c);
 					DIE;
@@ -221,13 +208,43 @@ void _print_parsed_tex(Node *n,FILE *fp){
 	}
 }
 #endif
-extern Poly _parser(Node *head,Node *tail,BlackBoard blackboard);
 
-Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
+Node * variableName(Node *node,char *str){
+	int dontBeString = 0;
+	while(node != NULL && (node->type == Number || node->type == Variable || (node->type == Command && !strcmp(node->str,"_")) )){
+		if(dontBeString && (node->type != Command)){
+			break;
+		}
+		str = stpcpy(str,node->str);
+		if(node->type == Command && !strcmp(node->str,"_")){
+			dontBeString = 0;
+		}else{
+			dontBeString = 1;
+		}
+		node = node->next;
+	}
+	return node;
+}
+
+Poly _parser(Node *head,Node *tail,BlackBoard *blackboard){
 	if(head == NULL || head == tail){
 		return nullPoly;
 	}
 	Node *now = head;
+	while(now != tail && now!= NULL){
+		if(now->type == Command && !strcmp(now->str,"=")){
+			char buff[256];
+			if(variableName(head,buff) != now){
+				fprintf(stderr,"Left hand side must be name of variable\n");
+				DIE;
+			}
+			Poly retval = _parser(now->next,tail,blackboard);
+			*blackboard = insert2BlackBoard(*blackboard,mkDefinition(buff,strlen(buff),polyDup(retval)));
+			return retval;
+		}
+		now = now->next;
+	}
+	now = head;
 	size_t capacity = 8;
 	Poly *ptr = malloc(sizeof(Poly) * capacity);
 	size_t s = 0;
@@ -243,13 +260,13 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 		now = now->next;
 	}
 	if(s > 0){
-		if(s + 1 != capacity){
+		if(s + 1 >= capacity){
 			capacity = s + 1;
 			ptr = realloc(ptr,sizeof(Poly) * capacity);
 		}
-		ptr[s] = _parser(head,now,blackboard);
-		if(!isNullPoly(ptr[s])){
-			s++;
+		ptr[s++] = _parser(head,tail,blackboard);
+		if(isNullPoly(ptr[s-1])){
+			s--;
 		}
 		return mkPolyArray(ptr,s);
 	}else{
@@ -301,17 +318,7 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 		}
 		now = now->next;
 	}
-	Poly retval = {
-		.ptr.items = malloc(sizeof(Item)) 
-		//For some reason, when I pass sizeof(Item) to malloc, allocated space get over written.
-		//This must be a bug of compiler!!!!!!! Not my fault!
-	};
-	initK(retval.ptr.items[0].coefficient);
-	copyK(retval.ptr.items[0].coefficient , K_1);
-	retval.ptr.items[0].degrees = NULL;
-	retval.ptr.items[0].size = 0;
-	setPolySize(retval,1);
-	setPolyType(retval,LEX);
+	Poly retval = K2Poly(K_1,LEX);
 	
 	now = head;
 	while(now != tail && now){
@@ -328,27 +335,35 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 					now = now->next->next->next;
 					Poly bunbo = _parser(nBunbo,nBunbo->next,blackboard);
 					Poly bunsi = _parser(nBunsi,nBunsi->next,blackboard);
-					if(bunbo.size == 1 && bunsi.size == 1 && bunbo.ptr.items[0].size == 0 && bunsi.ptr.items[0].size == 0){
-						Item w = {
-							.size = 0,
-							.degrees = NULL
-						};
-						initK(w.coefficient);
-						divK(w.coefficient,bunsi.ptr.items[0].coefficient,bunbo.ptr.items[0].coefficient);
-						Poly mulDis = item2Poly(w);
-						Poly tmp = polyMul(retval,mulDis);polyFree(mulDis);	polyFree(retval);
-						retval = tmp;
-					}else{
+					if(polyDegrees(bunsi) != 0 || polyDegrees(bunbo) != 0){
+						fprintf(stderr,"\"\\frac\" only accept numeric numbers\n");
+						DIE;
+					}else if(isNullPoly(bunsi) || isNullPoly(bunbo)){
+						polyFree(retval);polyFree(bunsi);polyFree(bunbo);
+						return nullPoly;
+					}else if(isZeroPoly(bunbo)){
+						fprintf(stderr,"Division by zero\n");
 						DIE;
 					}
+					if(polySize(bunsi) != 1 || polySize(bunbo) != 1){
+						fprintf(stderr,"This should not happen");
+						DIE;
+					}
+					Term w;
+					divK(w.coefficient,bunsi.ptr.terms[0].coefficient,bunbo.ptr.terms[0].coefficient);
+					setTermSize(w,0);
+					termDegreeAllocator(w);
+					Poly mulDis = term2Poly(w);
+					Poly tmp = polyMul(retval,mulDis);polyFree(mulDis);	polyFree(retval);
+					retval = tmp;
 				}else{
 					now = now->next;
 					if(now == NULL || now->type != Block){
-						fprintf(stderr,"\'{\' or \'(\' is expected after a call of function\n");
+						fprintf(stderr,"Append \"()\" to call function.\n");
+						fprintf(stderr,"Failed to call %s\n",str);
 						DIE;
 					}
-					blackboard = sortBlackBoard(blackboard);
-					Poly p = callBuiltInFunc(str,_parser(*((Node **)&now->str),NULL,blackboard),blackboard);
+					Poly p = callBuiltInFunc(str,_parser(*((Node **)&now->str),NULL,blackboard),*blackboard);
 					if(polyType(p) == ARRAY){
 						polyFree(retval);
 						return p;
@@ -368,8 +383,7 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 				if(now->next == NULL && head == now){
 					polyFree(retval);
 					retval = p;
-					now = now->next;
-					break;
+					return retval;
 				}
 				Poly tmp = polyMul(retval,p);
 				polyFree(p);
@@ -380,11 +394,14 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 			}
 			case Number:{
 				K val;
-				initK(val);
 				str2K(val,now->str);
+				if(!cmpK(val,K_0)){
+					polyFree(retval);
+					return polyDup(zeroPoly);
+				}
 				int i = 0;
 				for(i = 0;i < polySize(retval);i++){
-					mulK(retval.ptr.items[i].coefficient,retval.ptr.items[i].coefficient,val);
+					mulK(retval.ptr.terms[i].coefficient,retval.ptr.terms[i].coefficient,val);
 				}
 				now = now->next;
 				break;
@@ -406,23 +423,23 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 								subscriptDesuka = 0;
 							}
 							now = now->next;
-							N n;
+							uint64_t n;
 							switch(now->type){
 								case Block:{
 									Node *inside_block = *((Node **)&now->str);
 									if(inside_block->type == Number && inside_block->next == NULL){
-										n = (N)(atof(inside_block->str) + 0.5);
+										n = atoll(inside_block->str);
 										break;
+									}else{
+										fprintf(stderr,"Subscript must be just a number.\n");
+										DIE;
 									}
-									Poly tmp = _parser(inside_block,NULL,blackboard);
-									n = (N)(poly2Double(tmp) + 0.5);
-									polyFree(tmp);
 								}break;
 								case Number:{
-									n = (N) atol(now->str);
+									n = (N) atoll(now->str);
 								}break;
 								default : {
-									fprintf(stderr,"After \'%s\', a number or block must follow",now->str);
+									fprintf(stderr,"After \'%s\', a number must follow",now->str);
 									DIE;
 								}break;
 							}
@@ -436,38 +453,36 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 							break;
 						}
 					}
-					Item item = {
-						.size = (index + 1),
-						.degrees = calloc(index + 1,sizeof(N))
-					};
-					copyK(item.coefficient,K_1);
-					item.degrees[index] = degrees;
-					
-					Poly mulDis = {
-						.ptr.items = malloc(sizeof(Item))
-					};
-					mulDis.ptr.items[0] = item;
-					setPolySize(mulDis,1);
-					setPolyType(mulDis,LEX);
-					
+					Term term;
+					setTermSize(term,(index + 1));
+					termDegreeAllocator(term);
+					#if BOOLEAN
+					if(degrees > 1){
+						degrees = 1;
+					}
+					#endif
+					//fprintf(stderr,"%lu,%zu,%lu\n",index,termSize(term),degrees);
+					setTermDegree(term,index,degrees);
+					copyK(term.coefficient,K_1);
+					Poly mulDis = term2Poly(term);
 					Poly tmp = polyMul(retval,mulDis);
 					polyFree(retval);
 					polyFree(mulDis);
 					retval = tmp;
 				}else{
-					Poly mulDis = findFromBlackBoard(blackboard,now->str,strlen(now->str));
-					if(isNullPoly(mulDis) ) {fprintf(stderr,"Variable %s undefined.\n",now->str);DIE;}
+					char buff[256];
+					now = variableName(now,buff);
+					Poly mulDis = findFromBlackBoard(*blackboard,buff,strlen(buff));
+					if(isNullPoly(mulDis) ) {
+						polyFree(retval);
+						return mulDis;
+					}
 					if(polyType(mulDis) == ARRAY){
 						polyFree(retval);
 						return mulDis;
 					}
-					if(polyType(mulDis) != LEX){
-						Poly temp = polySort(mulDis,LEX); polyFree(mulDis);
-						mulDis = temp;
-					}
 					Poly tmp = polyMul(retval,mulDis); polyFree(retval); polyFree(mulDis);
 					retval = tmp;
-					now = now->next;
 				}
 				break;
 			}
@@ -479,74 +494,52 @@ Poly _parser(Node *head,Node *tail,BlackBoard blackboard){
 	return retval;
 }
 
-size_t _node2str(Node *head,Node *tail,char *buff,size_t index,size_t size){
-	while(head != tail && head){
-		switch(head->type){
-			case Command:{
-				if(!strcmp(head->str,"_")){
-					if(index + 2 >= size) {DIE;}
-					buff[index++] = '_';
-					buff[index] = 0;
-					break;
-				}
-				break;
-			}
-			case Block:{
-				index = _node2str(*((Node **)&head->str),NULL,buff,index,size);
-				break;
-			}
-			case Variable:{
-				strcpy(&buff[index],head->str);
-				index += strlen(head->str);
-				break;
-			}
-			case Number:{
-				strcpy(&buff[index],head->str);
-				index += strlen(head->str);
-				break;
-			}
+void freeNodes(Node *node){
+	while(node){
+		Node *next = node->next;
+		if(node->type == Block){
+			freeNodes(*((Node **)&node->str));
 		}
-		head = head->next;
-	}
-	return index;
-}
-
-Definition takeDefinitionFromNode(Node *node,BlackBoard blackboard){
-	Node *now = node;
-	if(node->type == Variable && node->next->type == Command && !strcmp(node->next->str,"=")){
-		if(!strcmp(node->str,"x")){
-			fprintf(stderr,"You cant define variable named \"x\".\n");
-			DIE;
-		}
-		return mkDefinition(node->str,strlen(node->str),_parser(now->next->next,NULL,blackboard));
-	}else{
-		char buff[2];
-		buff[0] = 0;
-		return mkDefinition(buff,0,_parser(node,NULL,blackboard));
+		free(node);
+		node = next;
 	}
 }
 
-Definition parser(FILE *stream,BlackBoard blackboard){
+Poly parser(FILE *stream,BlackBoard *blackboard){
 	int c;
 	while((c = fgetc(stream))!=EOF){
 		ungetc(c,stream);
 		Node *nodes = __parser(stream);
 		if(nodes == NULL){
-			return nullDefinition;
+			return nullPoly;
 		}
-		#if DEBUG == 1
+		#if DEBUG >= 2
 			fprintf(stderr,"Input : ");
 			_print_parsed_tex(nodes,stderr);
 			fprintf(stderr,"\n");
 			
-			Definition def = takeDefinitionFromNode(nodes,blackboard);
 			fprintf(stderr,"Parsed as : ");
-			polyPrint(def.poly,K2str,stderr);
-			fprintf(stderr,"\n");
-			return def;
 		#endif
-		return takeDefinitionFromNode(nodes,blackboard);
+		Poly retval = _parser(nodes,NULL,blackboard);
+		freeNodes(nodes);
+		#if DEBUG >= 2
+			polyPrint(retval,K2str,stderr);
+			fprintf(stderr,"\n");
+		#endif
+		return retval;
 	}
-	return nullDefinition;
+	return nullPoly;
 }
+
+Poly instantParser(char *code,BlackBoard *blackboard){
+	int p[2];
+	pipe(p);
+	write(p[1],code,strlen(code));
+	close(p[1]);
+	FILE *fp = fdopen(p[0],"r");
+	Poly retval = parser(fp,blackboard);
+	fclose(fp);
+	return retval;
+}
+
 
