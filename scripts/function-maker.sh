@@ -58,7 +58,7 @@ awk -v "VARIABLE_SIZE=$VARIABLE_SIZE" -v "NUMBER=$NUMBER" 'BEGIN{
 			printf("f%d = ",subscript++);
 			for(j = 0;j < VARIABLE_SIZE;j++){
 				if(and(i , lshift(1,j))){
-					printf("(x_%d + 0)",j);
+					printf("x_%d",j);
 				}else{
 					printf("(x_%d + 1)",j);
 				}

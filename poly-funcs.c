@@ -203,11 +203,12 @@ void polyPrint(unmut Poly poly,char*(*printer)(K),FILE *fp){
 		size_t i;
 		for(i = 0; i < termSize(term);i++){
 			if(termDegree(term,i)){
-				#if BOOLEAN
-				fprintf(fp,"x_{%ld}^{%ld} ",i+SUBSHIFT,termDegree(term,i));
-				#else
-				fprintf(fp,"x_{%ld}^{%ld} ",i+SUBSHIFT,termDegree(term,i));
-				#endif
+				fprintf(fp,"x_{%ld}",i+SUBSHIFT);
+				if(termDegree(term,i) == 1){
+					fprintf(fp," ");
+				}else{
+					fprintf(fp,"^{%ld} ",termDegree(term,i));
+				}
 			}
 		}
 	}
@@ -866,8 +867,15 @@ Poly isThisGrobnerBasis(Poly array){
 			if(_isCoprime(__polyIn(ptr[i]),__polyIn(ptr[j]))){
 				continue;
 			}
-			Poly s_i_j = polyS(ptr[i],ptr[j]);
-			reminder = polySim(s_i_j,array);polyFree(s_i_j);
+			Poly spoly = polyS(ptr[i],ptr[j]);
+			reminder = polySim(spoly,array);polyFree(spoly);
+			if(isZeroPoly(reminder)){
+				polyFree(reminder);
+			}else{
+				goto ret;
+			}
+			spoly = polyS(ptr[i],ptr[j]);
+			reminder = polySim(spoly,array);polyFree(spoly);
 			if(isZeroPoly(reminder)){
 				polyFree(reminder);
 			}else{
@@ -880,28 +888,46 @@ Poly isThisGrobnerBasis(Poly array){
 	return reminder;
 }
 Poly GrobnerBasis2ReducedGrobnerBasis(mut Poly grobner){
-	size_t i;
+	size_t i,index = 0;
 	size_t size = polySize(grobner);
+	int64_t currentSize = size;
 	Poly *ptr = unwrapPolyArray(grobner);
-	for(i = 0;i < size;i++){
-		size_t j;
-		for(j = 0; j < size;j++){
-			if(i == j){
-				continue;
-			}else if(isNullPoly(ptr[j])){
+	Poly *newArray = malloc(sizeof(Poly) * size);
+	while(currentSize > 0){
+		for(i = 0;i < size;i++){
+			Poly g = polyDup(ptr[i]);
+			if(isNullPoly(g)){
 				continue;
 			}
-			if(_isDiviable(__polyIn(ptr[i]),__polyIn(ptr[j]))){
-				polyFree(ptr[i]);
-				ptr[i] = nullPoly;
-				break;
+			size_t j;
+			for(j = 0; j < size;j++){
+				if(isNullPoly(ptr[j])){
+					continue;
+				}
+				if(_isDiviable(__polyIn(ptr[j]),__polyIn(g))){
+					polyFree(ptr[j]);
+					ptr[j] = nullPoly;
+					currentSize--;
+					break;
+				}
 			}
-		}
-		if(!isNullPoly(ptr[i])){
-			polyNice(ptr[i]);
+			int addG = 1;
+			for(j = 0;j < size;j++){
+				if(isNullPoly(ptr[j])){
+					continue;
+				}
+				if(_isDiviable(__polyIn(g),__polyIn(ptr[j]))){
+					addG = 0;
+					break;
+				}
+			}
+			if(addG){
+				newArray[index++] = g;
+			}
 		}
 	}
-	grobner = removeNullPolyFromArray(grobner);
+	polyFree(grobner);
+	grobner = mkPolyArray(newArray,index);
 	grobner = removeUnnecessaryPolies(grobner);
 	
 	ptr = unwrapPolyArray(grobner);

@@ -73,7 +73,7 @@ Definition mkDefinition(const char *name,size_t nameSize,mut Poly poly){
 	Definition retval;
 	if(nameSize + 1 < DEFINITION_BYTES_SIZE){
 		if(name[0] & 0x80){
-			fprintf(stderr,"variable name must be made of ascii chars\n");
+			fprintf(stderr,"variable name must be in ASCII chars\n");
 			DIE;
 		}
 		strncpy((char *)retval.bytes,name,DEFINITION_BYTES_SIZE);

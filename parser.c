@@ -38,6 +38,7 @@ enum NodeType {
 	Variable,
 	Number,
 	Block,
+	Say
 };
 
 #define NODE_STR_SIZE (128)
@@ -60,6 +61,8 @@ typedef struct _Node{
 	} \
 }while(0)
 
+Poly _parser(Node *head,Node *tail,BlackBoard *blackboard);
+
 Node * __parser(FILE *stream){
 	int c;
 	
@@ -77,6 +80,45 @@ Node * __parser(FILE *stream){
 				while((c = fgetc(stream))!= '\n' ){
 					;
 				}
+				break;
+			}
+			case '\"':{
+				char buff[NODE_STR_SIZE] = {0};
+				size_t i = 0;
+				while((c = fgetc(stream)) != EOF ){
+					if(c == '\\'){
+						c = fgetc(stream);
+						switch(c){
+							case '\\':{
+								c = '\\';
+							}break;
+							case 'r':{
+								c = '\r';
+							}break;
+							case 'n':{
+								c = '\n';
+							}break;
+							case 't':{
+								c = '\t';
+							}break;
+							case '\"':{
+								c = '\"';
+							}break;
+							default:{
+								fprintf(stderr,"Unknown Command \'\\%c\'[%x]\n",c,c);
+							}break;
+						}
+					}else if(c == '\"'){
+						break;
+					}
+					buff[i++] = c;
+					if(i + 1 >= NODE_STR_SIZE){
+						fprintf(stderr,"String you are trying to print out is too long.\n");
+						DIE;
+					}
+				}
+				buff[i] = 0;
+				append(head,butt,Say,buff);
 				break;
 			}
 			case '=':
@@ -107,7 +149,7 @@ Node * __parser(FILE *stream){
 				ungetc(c,stream);
 				char _buff[NODE_STR_SIZE] = {0};
 				char *buff = _buff;
-				while(isalpha(c = getNextChar(stream)) ){
+				while(isalpha(c = fgetc(stream)) ){
 					*buff++ = c;
 				}
 				*buff = 0;
@@ -168,7 +210,7 @@ Node * __parser(FILE *stream){
 	}
 	return head;
 }
-#if DEBUG == 1
+#if DEBUG >= 1
 void _print_parsed_tex(Node *n,FILE *fp){
 	if(n == NULL){
 		return;
@@ -203,6 +245,10 @@ void _print_parsed_tex(Node *n,FILE *fp){
 				fprintf(fp,"}");
 			}
 			break;
+			case Say : {
+				fprintf(fp," \"%s\" ",now->str);
+			}
+			break;
 		}
 		now = now->next;
 	}
@@ -210,20 +256,121 @@ void _print_parsed_tex(Node *n,FILE *fp){
 #endif
 
 Node * variableName(Node *node,char *str){
-	int dontBeString = 0;
+	enum NodeType lastType = Number;
 	while(node != NULL && (node->type == Number || node->type == Variable || (node->type == Command && !strcmp(node->str,"_")) )){
-		if(dontBeString && (node->type != Command)){
+		if(lastType == Variable && node->type == Variable){
 			break;
 		}
 		str = stpcpy(str,node->str);
-		if(node->type == Command && !strcmp(node->str,"_")){
-			dontBeString = 0;
-		}else{
-			dontBeString = 1;
-		}
+		lastType = node->type;
 		node = node->next;
 	}
 	return node;
+}
+
+//Lisp
+Poly executeSpecialFunction(Node *head,Node **next,BlackBoard *blackboard){
+	char *name = head->str;
+	if(!strcmp(name,"IF")){
+		if(head->next == NULL || head->next->next == NULL || head->next->next->next == NULL){
+			fprintf(stderr,"IF function takes three arguments.\n");
+			DIE;
+		}
+		Poly state = _parser(head->next,head->next->next,blackboard);
+		Poly retval = nullPoly;
+		if(isNullPoly(state) || isZeroPoly(state)){
+			retval = _parser(head->next->next->next,head->next->next->next->next,blackboard);
+		}else{
+			retval = _parser(head->next->next,head->next->next->next,blackboard);
+		}
+		*next = head->next->next->next->next;
+		polyFree(state);
+		return retval;
+	}else if(!strcmp(name,"FOREACH")){
+		if(head->next == NULL || head->next->next == NULL ){
+			fprintf(stderr,"FOREACH function takes two arguments.\n");
+			DIE;
+		}
+		Poly _array = _parser(head->next,head->next->next,blackboard);
+		Poly *array;
+		size_t arraySize;
+		if(polyType(_array) == ARRAY){
+			array = unwrapPolyArray(_array);
+			arraySize = polySize(_array);
+		}else{
+			array = &_array;
+			arraySize = 1;
+		}
+		size_t i;
+		Poly retval = nullPoly;
+		for(i = 0;i < arraySize;i++){
+			mut Poly tmp = findFromBlackBoard(*blackboard,"X",strlen("X"));
+			unmut Poly X = array[i];
+			*blackboard = insert2BlackBoard(*blackboard,mkDefinition("X",strlen("X"),polyDup(X)));
+			polyFree(retval);
+			retval = _parser(head->next->next,head->next->next->next,blackboard);
+			*blackboard = insert2BlackBoard(*blackboard,mkDefinition("X",strlen("X"),tmp));
+		}
+		*next = head->next->next->next;
+		*blackboard = insert2BlackBoard(*blackboard,mkDefinition("X",strlen("X"),polyDup(zeroPoly)));
+		polyFree(_array);
+		return retval;
+	}else if(!strcmp(name,"WHILE")){
+		if(head->next == NULL || head->next->next == NULL ){
+			fprintf(stderr,"WHILE function takes two arguments.\n");
+			DIE;
+		}
+		Poly retval = nullPoly;
+		Poly state = _parser(head->next,head->next->next,blackboard);
+		while(!isNullPoly(state) && !isZeroPoly(state)){
+			polyFree(retval);
+			polyFree(state);
+			retval = _parser(head->next->next,head->next->next->next,blackboard);
+			state = _parser(head->next,head->next->next,blackboard);
+		}
+		*next = head->next->next->next;
+		polyFree(state);
+		return retval;
+	}else if(!strcmp(name,"frac") || !strcmp(name,"FRAC")){
+		if(head->next == NULL || head->next->next == NULL ){
+			fprintf(stderr,"FRAC function takes two arguments.\n");
+			DIE;
+		}
+		Node *nBunsi = head->next;
+		Node *nBunbo = head->next->next;
+		*next = head->next->next->next;
+		Poly bunbo = _parser(nBunbo,nBunbo->next,blackboard);
+		Poly bunsi = _parser(nBunsi,nBunsi->next,blackboard);
+		if(polyType(bunbo) == ARRAY || polyType(bunsi) == ARRAY){
+			fprintf(stderr,"Invalid argument for frac.\n");
+			DIE;
+		}else if(isZeroPoly(bunsi)){
+			fprintf(stderr,"Division by zero.\n");
+			DIE;
+		}else if(isNullPoly(bunsi) || isNullPoly(bunbo)){
+			polyFree(bunsi);polyFree(bunbo);
+			return nullPoly;
+		}
+		Poly array = polyDiv(bunbo,bunsi);
+		Poly retval = polyDup(unwrapPolyArray(array)[0]);
+		polyFree(array);
+		polyFree(bunbo);
+		polyFree(bunsi);
+		return retval;
+	}
+	DIE;
+}
+
+int isSpecialFunction(const char * const name){
+	if(!strcmp(name,"IF")
+	|| !strcmp(name,"FOREACH")
+	|| !strcmp(name,"WHILE")
+	|| !strcmp(name,"frac")
+	|| !strcmp(name,"FRAC")
+		){
+		return 1;
+	}
+	return 0;
 }
 
 Poly _parser(Node *head,Node *tail,BlackBoard *blackboard){
@@ -324,58 +471,31 @@ Poly _parser(Node *head,Node *tail,BlackBoard *blackboard){
 	while(now != tail && now){
 		switch(now->type){
 			case Command:{
-				const char *str = now->str;
-				if(!strcmp(str,"frac")){
-					if(now->next == NULL || now->next->next == NULL ){
-						fprintf(stderr,"Invalid \\frac declaration\n");
-						DIE;
-					}
-					Node *nBunsi = now->next;
-					Node *nBunbo = now->next->next;
-					now = now->next->next->next;
-					Poly bunbo = _parser(nBunbo,nBunbo->next,blackboard);
-					Poly bunsi = _parser(nBunsi,nBunsi->next,blackboard);
-					if(polyDegrees(bunsi) != 0 || polyDegrees(bunbo) != 0){
-						fprintf(stderr,"\"\\frac\" only accept numeric numbers\n");
-						DIE;
-					}else if(isNullPoly(bunsi) || isNullPoly(bunbo)){
-						polyFree(retval);polyFree(bunsi);polyFree(bunbo);
-						return nullPoly;
-					}else if(isZeroPoly(bunbo)){
-						fprintf(stderr,"Division by zero\n");
-						DIE;
-					}
-					if(polySize(bunsi) != 1 || polySize(bunbo) != 1){
-						fprintf(stderr,"This should not happen");
-						DIE;
-					}
-					Term w;
-					divK(w.coefficient,bunsi.ptr.terms[0].coefficient,bunbo.ptr.terms[0].coefficient);
-					setTermSize(w,0);
-					termDegreeAllocator(w);
-					Poly mulDis = term2Poly(w);
-					Poly tmp = polyMul(retval,mulDis);polyFree(mulDis);	polyFree(retval);
-					retval = tmp;
+				const char * const str = now->str;
+				Poly p;
+				if(isSpecialFunction(str)){
+					Node *next;
+					p = executeSpecialFunction(now,&next,blackboard);
+					now = next;
 				}else{
 					now = now->next;
-					if(now == NULL || now->type != Block){
-						fprintf(stderr,"Append \"()\" to call function.\n");
-						fprintf(stderr,"Failed to call %s\n",str);
-						DIE;
+					if(now == NULL){
+						p = callBuiltInFunc(str,nullPoly,*blackboard);
+					}else{
+						p = callBuiltInFunc(str,_parser(*((Node **)&now->str),NULL,blackboard),*blackboard);
+						now = now->next;
 					}
-					Poly p = callBuiltInFunc(str,_parser(*((Node **)&now->str),NULL,blackboard),*blackboard);
-					if(polyType(p) == ARRAY){
-						polyFree(retval);
-						return p;
-					}else if(isNullPoly(p)){
-						return p;
-					}
-					Poly tmp = polyMul(retval,p);
-					polyFree(p);
-					polyFree(retval);
-					retval = tmp;
-					now = now->next;
 				}
+				if(polyType(p) == ARRAY){
+					polyFree(retval);
+					return p;
+				}else if(isNullPoly(p)){
+					return p;
+				}
+				Poly tmp = polyMul(retval,p);
+				polyFree(p);
+				polyFree(retval);
+				retval = tmp;
 				break;
 			}
 			case Block:{
@@ -461,7 +581,6 @@ Poly _parser(Node *head,Node *tail,BlackBoard *blackboard){
 						degrees = 1;
 					}
 					#endif
-					//fprintf(stderr,"%lu,%zu,%lu\n",index,termSize(term),degrees);
 					setTermDegree(term,index,degrees);
 					copyK(term.coefficient,K_1);
 					Poly mulDis = term2Poly(term);
@@ -484,6 +603,11 @@ Poly _parser(Node *head,Node *tail,BlackBoard *blackboard){
 					Poly tmp = polyMul(retval,mulDis); polyFree(retval); polyFree(mulDis);
 					retval = tmp;
 				}
+				break;
+			}
+			case Say:{
+				fprintf(OUTFILE,"%s",now->str);
+				now = now->next;
 				break;
 			}
 			default :{

@@ -56,14 +56,16 @@ Poly builtIn_PBB(Poly arg,BlackBoard blackboard){
 Poly builtIn_PP(Poly arg,BlackBoard blackboard){
 	polyPrint(arg,K2str,OUTFILE);
 	fprintf(OUTFILE,"\\\\\n");
-	polyFree(arg);
-	return nullPoly;
+	return arg;
+}
+Poly builtIn_PPR(Poly arg,BlackBoard blackboard){
+	polyPrint(arg,K2str,OUTFILE);
+	return arg;
 }
 Poly builtIn_PPS(Poly arg,BlackBoard blackboard){
 	polyPrint(arg,K2strScientific,OUTFILE);
 	fprintf(OUTFILE,"\n");
-	polyFree(arg);
-	return nullPoly;
+	return arg;
 }
 Poly builtIn_SP(Poly arg,BlackBoard blackboard){
 	if(polyType(arg) != ARRAY && polySize(arg) != 2){
@@ -75,7 +77,6 @@ Poly builtIn_SP(Poly arg,BlackBoard blackboard){
 	polyFree(arg);
 	return retval;
 }
-
 Poly builtIn_BBA(Poly array,BlackBoard blackboard){
 	Poly r;
 	size_t size;
@@ -111,9 +112,16 @@ Poly builtIn_RED(Poly arg,BlackBoard blackboard){
 		DIE;
 	}
 	Poly *array = unwrapPolyArray(arg);
-	Poly divisors = mkPolyArray(&array[1],polySize(arg) - 1 );
+	Poly divisors;
+	if(polyType(array[1]) == ARRAY){
+		divisors = polyDup(array[1]);
+	}else{
+		Poly tmp = polyDup(array[1]);
+		divisors = mkPolyArray(&tmp,1);
+	}
 	Poly result = polySim(array[0],divisors);
 	polyFree(arg);
+	polyFree(divisors);
 	return result;
 }
 Poly builtIn_SRT(Poly arg,BlackBoard blackboard){
@@ -245,12 +253,43 @@ extern Poly PAC(Poly arg,BlackBoard blackboard);
 
 Poly builtIn_PAC(Poly arg,BlackBoard blackboard){
 	#if !BOOLEAN
-	fprintf(stderr,"This function can be used only in boolean mode.");
+	fprintf(stderr,"This function can be used in boolean mode only.");
 	DIE;
 	#endif
 	return PAC(arg,blackboard);
 }
 
+Poly builtIn_DIV(Poly arg,BlackBoard blackboard){
+	if(polyType(arg) != ARRAY && polySize(arg) != 2){
+		DIE;
+	}
+	Poly *array = unwrapPolyArray(arg);
+	Poly retval = polyDiv(array[0],array[1]);
+	polyFree(arg);
+	return retval;
+}
+Poly builtIn_DIE(Poly arg,BlackBoard blackboard){
+	polyFree(arg);
+	fprintf(stderr,"built-in function \"DIE\" is called.\n");
+	fprintf(stderr,"bye bye.\n");
+	exit(0);
+}
+Poly builtIn_IN(Poly arg,BlackBoard blackboard){
+	if(polyType(arg) == ARRAY){
+		Poly *array = unwrapPolyArray(arg);
+		Poly *retval = malloc(sizeof(Poly)*polySize(arg));
+		size_t i;
+		for(i = 0;i < polySize(arg);i++){
+			retval[i] = builtIn_IN(polyDup(array[i]),blackboard);
+		}
+		polyFree(arg);
+		return mkPolyArray(retval,i);
+	}else{
+		Poly retval = polyIn(arg);
+		polyFree(arg);
+		return retval;
+	}
+}
 
 //ABCDEFGHIJKLMNOPQRSTUVWXYZ
 const Function BUILT_IN_FUNCS[] = {
@@ -270,6 +309,21 @@ const Function BUILT_IN_FUNCS[] = {
 		.funcptr = builtIn_CLOCK
 	},
 	{
+		.name = "DIE",
+		.description = "Die.",
+		.funcptr = builtIn_DIE
+	},
+	{
+		.name = "DIV",
+		.description = "Divide polynomial.",
+		.funcptr = builtIn_DIV
+	},
+	{
+		.name = "IN",
+		.description = "Return initial ideal or initial polynomial.",
+		.funcptr = builtIn_IN
+	},
+	{
 		.name = "PAC",
 		.description = "Convert array of polynomials to C code.",
 		.funcptr = builtIn_PAC
@@ -283,6 +337,11 @@ const Function BUILT_IN_FUNCS[] = {
 		.name = "PP",
 		.description = "Print given polynomials.",
 		.funcptr = builtIn_PP
+	},
+	{
+		.name = "PPR",
+		.description = "Same as PP. But does not print out \\\\ and \\n",
+		.funcptr = builtIn_PPR
 	},
 	{
 		.name = "PPS",
@@ -313,8 +372,7 @@ const Function BUILT_IN_FUNCS[] = {
 		.name = "SUB",
 		.description = "Substitute values",
 		.funcptr = builtIn_SUB
-	}
-	
+	}	
 };
 const size_t BUILT_IN_FUNC_SIZE = sizeof(BUILT_IN_FUNCS)/sizeof(Function);
 

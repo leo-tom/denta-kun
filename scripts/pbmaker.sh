@@ -47,6 +47,11 @@ then
 	DENSITY=50
 fi
 
+if [ -z $PRINT_POLY ]
+then
+	PRINT_POLY=0
+fi
+
 mkfifo $FIFO_FILE
 
 #to make picture huge, set size 13824 and rewrite code.
@@ -57,6 +62,14 @@ $SIZE $SIZE" | cat /dev/stdin $FIFO_FILE | convert pbm:- png:$OUTFILE &
 else
 	echo "P1
 $SIZE $SIZE" | cat /dev/stdin $FIFO_FILE > $OUTFILE &
+fi
+
+FUNCTION=$(dentakun-tool function-maker $RULE | sed 's/x_{0}/__{2}/g; s/x_{1}/__{0}/g; s/x_{2}/__{1}/g; s/__/x_/g')
+
+if [ $PRINT_POLY -ne 0 ]
+then
+	echo $FUNCTION
+	exit 0
 fi
 
 echo $(awk -v "density=$DENSITY" -v "size=$SIZE" -v "seed=$SEED" 'BEGIN{
@@ -90,7 +103,7 @@ echo $(awk -v "density=$DENSITY" -v "size=$SIZE" -v "seed=$SEED" 'BEGIN{
 		}
 	}
 }
-') 'f=' $(dentakun-tool function-maker $RULE) '\PP(\BCA(f)) \\' | bentakun | sed 'y/(),/   /; s/ //g ; s/\\//g ; /^$/d ' > $FIFO_FILE
+') 'f=' "$FUNCTION" '\PP(\BCA(f)) \\' | bentakun | sed 'y/(),/   /; s/ //g ; s/\\//g ; /^$/d ' > $FIFO_FILE
 rm -f $FIFO_FILE
 
 
