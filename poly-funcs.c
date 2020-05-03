@@ -250,6 +250,25 @@ int cmpTerm(MonomialOrder order,Term v1,Term v2){
 	}
 	return cmp(&v1,&v2);
 }
+int polyCmp(unmut Poly v1,unmut Poly v2){
+	if(polyType(v1) != polyType(v2)){
+		fprintf(stderr,"You cannot compare polies whose polynomial order are different.\n");
+		DIE;
+	}
+	MonomialOrder order = polyType(v1);
+	if(order == ARRAY){
+		DIE;
+	}
+	size_t size = polySize(v1) > polySize(v2) ? polySize(v1) : polySize(v2);
+	size_t i;
+	for(i = 0;i < size;i++){
+		int val = cmpTerm(order,v1.ptr.terms[i],v2.ptr.terms[i]);
+		if( val != 0 ){
+			return val;
+		}
+	}
+	return 0;
+}
 Poly polyAdd(unmut Poly v1,unmut Poly v2){
 	if(polyType(v1) != polyType(v2)){
 		fprintf(stderr,"Trying to add Poly sorted by different monomial order\n");
@@ -815,6 +834,9 @@ Poly removeNullPolyFromArray(mut Poly poly){
 }
 Poly removeUnnecessaryPolies(Poly grobner){
 	int somethingHappened;
+	if(polySize(grobner) <= 1){
+		return grobner;
+	}
 	do{
 		somethingHappened = 0;
 		size_t size = polySize(grobner);

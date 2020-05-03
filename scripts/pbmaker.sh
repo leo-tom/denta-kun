@@ -16,7 +16,8 @@
 #You should have received a copy of the GNU General Public License
 #along with Dentakun.  If not, see <http://www.gnu.org/licenses/>.
 #
-FIFO_FILE='_FIFO_PBMAKER_'
+
+FIFO_FILE="_FIFO_PBMAKER_$PPID_"
 
 if [ -z $RULE ]
 then
@@ -52,6 +53,30 @@ then
 	PRINT_POLY=0
 fi
 
+if [ -z $VARIABLE_SIZE ]
+then
+	export VARIABLE_SIZE=3
+fi
+
+if [ $VARIABLE_SIZE -eq '3' ]
+then
+	CONVERT_STR='s/x_{0}/__{2}/g; s/x_{1}/__{0}/g; s/x_{2}/__{1}/g; s/__/x_/g'
+elif [ $VARIABLE_SIZE -eq '5' ]
+then
+	CONVERT_STR='s/x_{0}/__{4}/g; s/x_{1}/__{2}/g; s/x_{2}/__{0}/g; s/x_{3}/__{1}/g; s/x_{4}/__{3}/g; s/__/x_/g'
+else
+	echo error
+	exit 1
+fi
+
+FUNCTION=$(dentakun-tool function-maker $RULE | sed "$CONVERT_STR")
+
+if [ $PRINT_POLY -ne 0 ]
+then
+	echo $FUNCTION
+	exit 0
+fi
+
 mkfifo $FIFO_FILE
 
 #to make picture huge, set size 13824 and rewrite code.
@@ -64,15 +89,7 @@ else
 $SIZE $SIZE" | cat /dev/stdin $FIFO_FILE > $OUTFILE &
 fi
 
-FUNCTION=$(dentakun-tool function-maker $RULE | sed 's/x_{0}/__{2}/g; s/x_{1}/__{0}/g; s/x_{2}/__{1}/g; s/__/x_/g')
-
-if [ $PRINT_POLY -ne 0 ]
-then
-	echo $FUNCTION
-	exit 0
-fi
-
-echo $(awk -v "density=$DENSITY" -v "size=$SIZE" -v "seed=$SEED" 'BEGIN{
+echo $($AWK -v "density=$DENSITY" -v "size=$SIZE" -v "seed=$SEED" 'BEGIN{
 	if(size <= 0){
 		size = 256;
 	}
@@ -103,7 +120,7 @@ echo $(awk -v "density=$DENSITY" -v "size=$SIZE" -v "seed=$SEED" 'BEGIN{
 		}
 	}
 }
-') 'f=' "$FUNCTION" '\PP(\BCA(f)) \\' | bentakun | sed 'y/(),/   /; s/ //g ; s/\\//g ; /^$/d ' > $FIFO_FILE
+') 'f=' "$FUNCTION" '\\ \PP(\BCA(f)) \\' | bentakun | sed 'y/(),/   /; s/ //g ; s/\\//g ; /^$/d ' > $FIFO_FILE
 rm -f $FIFO_FILE
 
 

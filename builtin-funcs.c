@@ -198,42 +198,37 @@ Poly builtIn_SUB(Poly arg,BlackBoard blackboard){
 	}
 	Poly poly = unwrapPolyArray(arg)[0];
 	Poly __values = unwrapPolyArray(arg)[1];
-	Poly *_values;
+	Poly *values;
 	size_t size;
 	if(polyType(__values) != ARRAY){
 		size = 1;
-		_values = &__values;
+		values = &__values;
 	}else{
 		size = polySize(__values);
-		_values = unwrapPolyArray(__values);
+		values = unwrapPolyArray(__values);
 	}
 	int i,j,k;
-	K *values = malloc(sizeof(K)*size);
-	for(i = 0;i < size;i++){
-		copyK(values[i], poly2K(values[i],_values[i]));
-	}
-	K val;
-	copyK(val,K_0);
+	Poly val = polyDup(zeroPoly);
 	for(i = 0;i < polySize(poly);i++){
-		K tmp;
-		copyK(tmp,K_1);
+		Poly tmp = K2Poly(poly.ptr.terms[i].coefficient,polyType(poly));
 		for(j = 0;j < termSize(poly.ptr.terms[i]);j++){
 			if(termDegree(poly.ptr.terms[i],j)){
 				if(j >= size){
 					goto err;
 				}
 				for(k = 0;k < termDegree(poly.ptr.terms[i],j);k++){
-					mulK(tmp,tmp,values[j]);
+					Poly temp = polyMul(tmp,values[j]);
+					polyFree(tmp);
+					tmp = temp;
 				}
 			}
 		}
-		addK(val,val,tmp);
+		Poly temp = polyAdd(val,tmp);
+		polyFree(val);
+		val = temp;
 	}
-	
-	Poly retval = K2Poly(val,polyType(poly));
 	polyFree(arg);
-	free(values);
-	return retval;
+	return val;
 	err : 
 	fprintf(stderr,"builtIn_SUB expects 2 arrays as argument.\n");
 	fprintf(stderr,"...or, you did not give me enough values to substitute.\n");
@@ -290,6 +285,73 @@ Poly builtIn_IN(Poly arg,BlackBoard blackboard){
 		return retval;
 	}
 }
+Poly builtIn_RZP(Poly arg,BlackBoard blackboard){
+	if(polyType(arg) != ARRAY){
+		if(isZeroPoly(arg)){
+			polyFree(arg);
+			return nullPoly;
+		}
+	}else{
+		Poly *array = unwrapPolyArray(arg);
+		size_t i;
+		size_t index = 0;
+		for(i = 0;i < polySize(arg);i++){
+			if(isNullPoly(array[index++] = builtIn_RZP(array[i],blackboard))){
+				index--;
+			}
+		}
+		setPolySize(arg,index);
+	}
+	return arg;
+}
+Poly builtIn_EQ(Poly arg,BlackBoard blackboard){
+	if(polyType(arg) != ARRAY || polySize(arg) <= 1){
+		fprintf(stderr,"EQ function expects two parameters\n");
+		DIE;
+	}else{
+		Poly *array = unwrapPolyArray(arg);
+		size_t i;
+		for(i = 0;i + 1 < polySize(arg);i++){
+			if(polyType(array[i]) != ARRAY && polyType(array[i + 1]) != ARRAY){
+				if(polyType(array[i]) != polyType(array[i + 1])){
+					Poly p1 = polySort(array[i],LEX);
+					Poly p2 = polySort(array[i+1],LEX);
+					if(polyCmp(p1,p2)){
+						polyFree(p1);
+						polyFree(p2);
+						return polyDup(zeroPoly);
+					}
+					polyFree(p1);
+					polyFree(p2);
+				}else{
+					if(polyCmp(array[i],array[i+1])){
+						polyFree(arg);
+						return polyDup(zeroPoly);
+					}
+				}
+			}else if(polyType(array[i]) == ARRAY && polyType(array[i + 1]) == ARRAY){
+				if(polySize(array[i]) != polySize(array[i + 1])){
+						return polyDup(zeroPoly);
+				}
+				size_t j;
+				for(j = 0;j < polySize(array[i]);j++){
+					Poly *ptr = malloc(sizeof(Poly) * 2);
+					ptr[0] = polyDup(unwrapPolyArray(array[i])[j]);
+					ptr[1] = polyDup(unwrapPolyArray(array[i + 1])[j]);
+					Poly retval = builtIn_EQ(mkPolyArray(ptr,2),blackboard);
+					if(isZeroPoly(retval)){
+						polyFree(arg);
+						return retval;
+					}
+					polyFree(retval);
+				}
+			}else {
+				return polyDup(zeroPoly);
+			}
+		}
+	}
+	return K2Poly(K_1,LEX);
+}
 
 //ABCDEFGHIJKLMNOPQRSTUVWXYZ
 const Function BUILT_IN_FUNCS[] = {
@@ -317,6 +379,11 @@ const Function BUILT_IN_FUNCS[] = {
 		.name = "DIV",
 		.description = "Divide polynomial.",
 		.funcptr = builtIn_DIV
+	},
+	{
+		.name = "EQ",
+		.description = "True if Equal",
+		.funcptr = builtIn_EQ
 	},
 	{
 		.name = "IN",
@@ -352,6 +419,11 @@ const Function BUILT_IN_FUNCS[] = {
 		.name = "RED",
 		.description = "Reduce polynomial",
 		.funcptr = builtIn_RED
+	},
+	{
+		.name = "RZP",
+		.description = "Remove Zeros in array.",
+		.funcptr = builtIn_RZP
 	},
 	{
 		.name = "SP",

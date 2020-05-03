@@ -16,7 +16,6 @@
 #You should have received a copy of the GNU General Public License
 #along with Dentakun.  If not, see <http://www.gnu.org/licenses/>.
 #
-FIFO_FILE='_FIFO_PBMAKER_'
 if [ $# -eq 1 ]
 then
 	NUMBER="$1"
@@ -27,10 +26,11 @@ fi
 
 if [ -z $VARIABLE_SIZE ]
 then
-	VARIABLE_SIZE=$(awk -v "rule=$NUMBER" 'BEGIN{if(rule==1||rule==0){print 1}else{print int(log(log(rule)/log(2))/log(2)+1)}}')
+	VARIABLE_SIZE=$($AWK -v "rule=$NUMBER" 'BEGIN{if(rule==1||rule==0){print 1}else{print int(log(log(rule)/log(2))/log(2)+1)}}')
 fi
 
-LIMIT=$(awk -v "size=$VARIABLE_SIZE" 'BEGIN{printf("%u", (2^(2^size)) -1 );}')
+
+LIMIT=$($AWK -v "size=$VARIABLE_SIZE" 'BEGIN{print (2.0^(2^size))}')
 
 if [ $VARIABLE_SIZE -lt 0 -o $VARIABLE_SIZE -gt 64 ]
 then
@@ -50,33 +50,25 @@ then
 	SUBSHIFT=0
 fi
 
-awk -v "VARIABLE_SIZE=$VARIABLE_SIZE" -v "NUMBER=$NUMBER" 'BEGIN{
-	subscript = 0;
+$AWK -v "VARIABLE_SIZE=$VARIABLE_SIZE" -v "NUMBER=$NUMBER" 'BEGIN{
 	size = 2^VARIABLE_SIZE;
+	printf("f = 0 \\\\\n");
+	printf("tmp = 0 \\\\\n");
 	for(i = 0;i < size;i++){
 		if(and(NUMBER,lshift(1,i))){
-			printf("f%d = ",subscript++);
+			printf("tmp = ");
 			for(j = 0;j < VARIABLE_SIZE;j++){
 				if(and(i , lshift(1,j))){
-					printf("x_%d",j);
+					printf("x_%d ",j);
 				}else{
-					printf("(x_%d + 1)",j);
+					printf("(x_%d + 1) ",j);
 				}
 			}
 			printf("\\\\\n");
+			printf("f = f + tmp + f \\cdot tmp \\\\\n");
 		}
 	}
-	if(subscript == 0){
-		printf("f = 0 \\\\\n");
-	}else if(subscript == 1){
-		printf("f = f0 \\\\\n");
-	}else{
-		for(i = subscript - 2;i >= 0;i--){
-			printf("f%d = f%d + f%d + f%d f%d  \\\\\n",i,i,i+1,i,i+1);
-		}
-		printf("f = f0 \\\\\n" );
-	}
-	printf("\\PP(f) \\\\\n");
+	printf("\\PPR(f) \\\\\n");
 }
 ' | bentakun -s $SUBSHIFT > $OUTFILE
 

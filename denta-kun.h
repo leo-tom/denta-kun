@@ -247,6 +247,7 @@ Poly polyDiv(unmut Poly dividend,unmut Poly divisor);
 Poly polySim(unmut Poly dividend,unmut Poly divisors);
 Poly polyS(unmut Poly f,unmut Poly g);
 void polyNice(unmut Poly p);
+int polyCmp(unmut Poly v1,unmut Poly v2);
 
 Poly K2Poly(mut K k,MonomialOrder order);
 #define poly2K(k,poly) ((polyType(poly) == ARRAY || polySize(poly) != 1 || termSize(poly.ptr.terms[0]) != 0) ? \

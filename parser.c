@@ -77,48 +77,37 @@ Node * __parser(FILE *stream){
 	while((c = getNextChar(stream))!= EOF){
 		switch(c){
 			case '%':{
-				while((c = fgetc(stream))!= '\n' ){
-					;
-				}
-				break;
-			}
-			case '\"':{
-				char buff[NODE_STR_SIZE] = {0};
-				size_t i = 0;
-				while((c = fgetc(stream)) != EOF ){
-					if(c == '\\'){
-						c = fgetc(stream);
-						switch(c){
-							case '\\':{
-								c = '\\';
-							}break;
-							case 'r':{
-								c = '\r';
-							}break;
-							case 'n':{
-								c = '\n';
-							}break;
-							case 't':{
-								c = '\t';
-							}break;
-							case '\"':{
-								c = '\"';
-							}break;
-							default:{
-								fprintf(stderr,"Unknown Command \'\\%c\'[%x]\n",c,c);
-							}break;
+				if((c = fgetc(stream)) == ':'){
+					while((c = fgetc(stream)) != '\n' && c != EOF){
+						if(c == '\\'){
+							c = fgetc(stream);
+							switch(c){
+								case '\\':{
+									c = '\\';
+								}break;
+								case 'r':{
+									c = '\r';
+								}break;
+								case 'n':{
+									c = '\n';
+								}break;
+								case 't':{
+									c = '\t';
+								}break;
+								default:{
+									fprintf(stderr,"Unknown special char \'\\%c\'[%x]\n",c,c);
+									DIE;
+								}break;
+							}
 						}
-					}else if(c == '\"'){
-						break;
+						fputc(c,OUTFILE);
 					}
-					buff[i++] = c;
-					if(i + 1 >= NODE_STR_SIZE){
-						fprintf(stderr,"String you are trying to print out is too long.\n");
-						DIE;
+				}else{
+					ungetc(c,stream);
+					while((c = fgetc(stream))!= '\n' ){
+						;
 					}
 				}
-				buff[i] = 0;
-				append(head,butt,Say,buff);
 				break;
 			}
 			case '=':
@@ -502,8 +491,10 @@ Poly _parser(Node *head,Node *tail,BlackBoard *blackboard){
 				Poly p = _parser(*((Node **)&now->str),NULL,blackboard);
 				if(now->next == NULL && head == now){
 					polyFree(retval);
-					retval = p;
-					return retval;
+					return p;
+				}else if(polyType(p) == ARRAY){
+					polyFree(retval);
+					return p;
 				}
 				Poly tmp = polyMul(retval,p);
 				polyFree(p);
@@ -599,6 +590,11 @@ Poly _parser(Node *head,Node *tail,BlackBoard *blackboard){
 					if(polyType(mulDis) == ARRAY){
 						polyFree(retval);
 						return mulDis;
+					}
+					if(polyType(mulDis) != polyType(retval)){
+						Poly tmp = polySort(mulDis,polyType(retval));
+						polyFree(mulDis);
+						mulDis = tmp;
 					}
 					Poly tmp = polyMul(retval,mulDis); polyFree(retval); polyFree(mulDis);
 					retval = tmp;
