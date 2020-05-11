@@ -153,14 +153,14 @@ void polyPrint(unmut Poly poly,char*(*printer)(K),FILE *fp){
 		while(size--){
 			polyPrint(*head,printer,fp);
 			if(size != 0){
-				fprintf(fp," , ");
+				fprintf(fp,", ");
 			}
 			if(polyType(*head) == ARRAY){
 				fprintf(fp,"\n");
 			}
 			head++;
 		}
-		fprintf(fp," )");
+		fprintf(fp,")");
 		return;
 	}
 	size_t index = 0;

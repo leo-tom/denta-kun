@@ -17,8 +17,6 @@
 #along with Dentakun.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-FIFO_FILE="_FIFO_PBMAKER_$PPID_"
-
 if [ -z $RULE ]
 then
 	RULE=1
@@ -76,6 +74,8 @@ then
 	echo $FUNCTION
 	exit 0
 fi
+
+FIFO_FILE="_FIFO_PBMAKER_$PPID"
 
 mkfifo $FIFO_FILE
 

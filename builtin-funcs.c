@@ -34,6 +34,12 @@ Poly callBuiltInFunc(const char *name,Poly arg,BlackBoard blackboard){
 	if(found == NULL){
 		fprintf(stderr, "\"%s\" is not defined.\n",name);DIE;
 	}
+	#if DEBUG >= 2
+	fprintf(stderr, "Calling \"%s\" with : ",name);
+	polyPrint(arg,K2str,stderr);
+	fprintf(stderr,"\n");
+	#endif
+	
 	return found->funcptr(arg,blackboard);
 }
 
@@ -83,18 +89,18 @@ Poly builtIn_BBA(Poly array,BlackBoard blackboard){
 	do{
 		size = polySize(array);
 		r = isThisGrobnerBasis(array);
-		#if DEBUG == 1
+		#if DEBUG >= 2
 		polyPrint(array,K2str,stderr);
 		fprintf(stderr,"is ");
 		#endif
 		if(isZeroPoly(r) || polyDegrees(r) == 0){
-			#if DEBUG == 1
+			#if DEBUG >= 2
 			fprintf(stderr,"Grobner basis.\n ");
 			#endif
 			polyFree(r);
 			break;
 		}
-		#if DEBUG == 1
+		#if DEBUG >= 2
 		fprintf(stderr,"not Grobner basis because : \n");
 		polyPrint(r,K2str,stderr);
 		fprintf(stderr,"is not empty.\n");
@@ -112,16 +118,8 @@ Poly builtIn_RED(Poly arg,BlackBoard blackboard){
 		DIE;
 	}
 	Poly *array = unwrapPolyArray(arg);
-	Poly divisors;
-	if(polyType(array[1]) == ARRAY){
-		divisors = polyDup(array[1]);
-	}else{
-		Poly tmp = polyDup(array[1]);
-		divisors = mkPolyArray(&tmp,1);
-	}
-	Poly result = polySim(array[0],divisors);
+	Poly result = polySim(array[0],array[1]);
 	polyFree(arg);
-	polyFree(divisors);
 	return result;
 }
 Poly builtIn_SRT(Poly arg,BlackBoard blackboard){
@@ -134,21 +132,28 @@ Poly builtIn_SRT(Poly arg,BlackBoard blackboard){
 		polyFree(arg);
 		return nullPoly;
 	}
-	int64_t type = poly2Double(array[0]) + 0.5;
+
 	MonomialOrder order;
-	switch (type) {
+	if(polySize(array[0]) != 1){
+		fprintf(stderr,"Invalid MonomialOrder \n ");
+		DIE;
+	}
+	switch (termSize(array[0].ptr.terms[0])) {
 		case MONOMIAL_ORDER_IN_BIN__LEX: {order = LEX;break;}
 		case MONOMIAL_ORDER_IN_BIN__RLEX: {order = RLEX;break;}
 		case MONOMIAL_ORDER_IN_BIN__PLEX: {order = PLEX;break;}
+		case MONOMIAL_ORDER_IN_BIN__PRLEX: {order = PRLEX;break;}
 		default :{
-			fprintf(stderr,"Unknown monomial order \"%ld\"\n",type);
+			fprintf(stderr,"Unknown monomial order : ");
+			polyPrint(array[0],K2str,stderr);
 			DIE;
 		}
 	}
-	size_t i;
+	
 	size--;
 	array++;
 	Poly *ptr = malloc(size * sizeof(Poly));
+	size_t i;
 	for(i = 0;i < size;i++){
 		ptr[i] = polySort(array[i],order);
 	}

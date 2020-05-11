@@ -2,7 +2,7 @@
 <html>
 <head>
 	<meta charset="utf-8">
-	<meta name="copyright" content="(C) Leo Tomura 2018">
+	<meta name="copyright" content="(C) Leo Tomura 2020">
 	<style type="text/css">
 		.ALL{
 			width: 60%;
@@ -141,6 +141,43 @@ There are some pre-defined variables. Here are list of it :
 	<td>
 		This variable is used only when BCA_FIXED is set to 1.
 		BCA function use this value for fixed value when treating edges.
+	</td>
+</tr>
+</table>
+<p>
+
+<h3>Functions</h3>
+<p>
+To call function, you need to put '\' and let function name follow, and then give then arguments.
+For instance, to print out 
+<div style="text-align: center;">LEGALISE = 420 \\</div>
+You can also use digital numbers for variable name, but name of variables must not start from digits.
+</p>
+<p>
+You cannot use 'x' as name of constants you define. 'x' is used to define polynomial.
+You can make variables indexed using '_'. To specify degree of a variable, use '^'.
+For example, definition of a unit circle would be :
+<div style="text-align: center;">circle = x^2 + x_1^2 - 1 \\</div>
+</p>
+
+<p>
+When you did not use '=' , for instance, if you just typed
+<div style="text-align: center;">x^2 + x_1^2 - 1 \\</div>
+the polynomial can be referenced from variable named "$n" where n is current line number. 
+</p>
+
+<p>
+Dentakun has several built-in functions. Here is list of it:
+<table border=1>
+<caption>Built-in Functions</caption>
+<tr><th>Name</th><th>Arguments</th><th>Return value</th><th>Notes</th></tr>
+<tr>
+	<td>SRT</td>
+	<td>(MonomialOrder,Poly) | (MonomialOrder,ArrayOfPolies)</td>
+	<td> Sorted polynomial(s) </td>
+	<td>
+		Sort given polynomial or polynomials with specified MonomialOrder.
+		We support 4 Monomial orders, that are : LEX, RLEX, PLEX, and PRLEX.
 	</td>
 </tr>
 </table>
@@ -360,7 +397,7 @@ However, they are able to objects that are pointed by pointer inside a structure
 </p>
 
 <div style="text-align: right;">
-Copyright (C) 2019 Leo Tomura
+Copyright (C) 2020 Leo Tomura
 </div>
 </body>
 </html>

@@ -27,7 +27,7 @@ size_t LOADED_FUNCTION_INPUT_SIZE = 0;
 size_t LOADED_FUNCTION_OUTPUT_SIZE = 0;
 
 const char PRE_INCLUDE[] = 
-	"LEX = 0 \\\\ RLEX = 1 \\\\ PLEX = 2\\\\ PRLEX = 3\\\\ X = 0 \\\\"
+	"LEX = x_0 \\\\ RLEX = x_1 \\\\ PLEX = x_2\\\\ PRLEX = x_3\\\\ X = 0 \\\\"
 	#if BOOLEAN
 	"BCA_PERIODIC = 1 \\\\ BCA_REFLECTIVE = 0 \\\\ BCA_FIXED = 0 \\\\ BCA_FIXED_VALUE = 0 \\\\"
 	"BCA_INITIAL_STATE = (0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,"
@@ -123,7 +123,7 @@ int main(int argc,char *argv[]){
 	while(!feof(infile)){
 		Poly poly;
 		size_t blackboardSize = blackboard.size;
-		#if !DEBUG
+		#if DEBUG == 0
 			poly = parser(infile,&blackboard);
 			cmdNumber++;
 		#else 
@@ -142,7 +142,12 @@ int main(int argc,char *argv[]){
 					#endif
 					size += sizeof(Term);
 				}
+				#if DEBUG == 1
 				fprintf(stderr,"%lu => sizeof({.size == %lu,.type == %d}) == %lu\n",cmdNumber,polySize(poly),polyType(poly),size);
+				#elif DEBUG >= 2
+				polyPrint(poly,K2str,stderr);
+				fprintf(stderr," => sizeof({.size == %lu,.type == %d}) == %lu\n",polySize(poly),polyType(poly),size);
+				#endif
 			}
 		#endif
 		if(blackboardSize == blackboard.size){

@@ -416,8 +416,32 @@ Poly _parser(Node *head,Node *tail,BlackBoard *blackboard){
 					Poly pLeft = _parser(head,now,blackboard);
 					Poly pRight = _parser(now->next,tail,blackboard);
 					Poly retval;
-					if(head != now){ 
-						retval = polyAdd(pLeft,pRight);
+					if(head != now){
+						if(polyType(pLeft) == ARRAY || polyType(pRight) == ARRAY){
+							if(polyType(pLeft) == ARRAY && polyType(pRight) == ARRAY){
+								size_t size = polySize(pLeft) + polySize(pRight);
+								Poly *ptr = malloc(sizeof(Poly) * size);
+								memcpy(ptr,unwrapPolyArray(pLeft),sizeof(Poly) * polySize(pLeft));
+								memcpy(&ptr[polySize(pLeft)],unwrapPolyArray(pRight),sizeof(Poly) * polySize(pRight));
+								free(unwrapPolyArray(pLeft));
+								free(unwrapPolyArray(pRight));
+								return mkPolyArray(ptr,size);
+							}else{
+								if(polyType(pLeft) == ARRAY){
+									Poly *ptr = unwrapPolyArray(pLeft);
+									ptr = realloc(ptr,sizeof(Poly) * (polySize(pLeft) + 1));
+									ptr[polySize(pLeft)] = pRight;
+									return mkPolyArray(ptr,(polySize(pLeft) + 1));
+								}else{
+									Poly *ptr = malloc(sizeof(Poly) * (polySize(pRight) + 1));
+									ptr[0] = pLeft;
+									memcpy(&ptr[1],unwrapPolyArray(pRight),sizeof(Poly) * polySize(pRight));
+									return mkPolyArray(ptr,polySize(pRight) + 1);
+								}
+							}
+						}else{
+							retval = polyAdd(pLeft,pRight);
+						}
 					}else{
 						return pRight;
 					}
