@@ -173,7 +173,7 @@ Node * __parser(FILE *stream){
 					char _buff[NODE_STR_SIZE] = {0};
 					char *buff = _buff;
 					*buff++ = c;
-					while(isdigit(c = fgetc(stream)) || c == '.' ){
+					while(isdigit(c = fgetc(stream)) || c == '.' || c == 'E' || c == 'e' ){
 						*buff++ = c;
 					}
 					ungetc(c,stream);
@@ -402,6 +402,7 @@ Poly _parser(Node *head,Node *tail,BlackBoard *blackboard){
 		}
 		ptr[s++] = _parser(head,tail,blackboard);
 		if(isNullPoly(ptr[s-1])){
+			fprintf(stderr,"NO!");
 			s--;
 		}
 		return mkPolyArray(ptr,s);

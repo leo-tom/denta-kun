@@ -237,6 +237,8 @@ Poly builtIn_SUB(Poly arg,BlackBoard blackboard){
 	err : 
 	fprintf(stderr,"builtIn_SUB expects 2 arrays as argument.\n");
 	fprintf(stderr,"...or, you did not give me enough values to substitute.\n");
+	polyPrint(arg,K2str,stderr);
+	fprintf(stderr,"\n");
 	DIE;
 }
 extern Poly BCA(Poly arg,BlackBoard blackboard);

@@ -103,7 +103,7 @@ void divK(K val,const K v1,const K v2);
 #define addK(val,v1,v2) (val = (v1 & 0x1) ^ (v2 & 0x1))
 #define subK(val,v1,v2) (val = (v1 & 0x1) ^ (v2 & 0x1))
 #define mulK(val,v1,v2) (val = (v1 & v2) & 0x1)
-#define divK(val,v1,v2) (val = v1 / v2 )
+#define divK(val,v1,v2) (val = (v1 == 0) ? 0 : 1 )
 #define str2K(val,str) ( atoi(str) ? (val = 1) : (val = 0) )
 #define K2double(k) ((double) k)
 #define cmpK(v1,v2) (v1 == v2 ? 0 : (v1 > v2 ? 1 : -1))

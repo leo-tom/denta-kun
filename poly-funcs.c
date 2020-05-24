@@ -259,7 +259,7 @@ int polyCmp(unmut Poly v1,unmut Poly v2){
 	if(order == ARRAY){
 		DIE;
 	}
-	size_t size = polySize(v1) > polySize(v2) ? polySize(v1) : polySize(v2);
+	size_t size = polySize(v1) > polySize(v2) ? polySize(v2) : polySize(v1);
 	size_t i;
 	for(i = 0;i < size;i++){
 		int val = cmpTerm(order,v1.ptr.terms[i],v2.ptr.terms[i]);
@@ -435,15 +435,22 @@ Poly polyDiv(unmut Poly dividend,unmut Poly divisors){
 		size = 1;
 	}
 	Term *in_g = malloc(sizeof(Term) * size);
+	int error = 1;
 	for(i = 0;i < size;i++){
 		in_g[i] = __polyIn(divisor[i]);
+		if(error && !isZeroPoly(divisor[i])){
+			error = 0;
+		}
 	}
 	Poly *retval = malloc(sizeof(Poly) * (size + 1));
 	for(i = 0;i < size;i++){
 		retval[i] = polyDup(zeroPoly);
 		setPolyType(retval[i],order);
 	}
-	while(1){
+	if(error){
+		goto ret;
+	}
+	while(!isZeroPoly(h)){
 		for(i = 0;i < polySize(h);i++){
 			for(j = 0;j < size;j++){
 				if(_isDiviable(h.ptr.terms[i],in_g[j])){
@@ -494,6 +501,7 @@ Poly polyDiv(unmut Poly dividend,unmut Poly divisors){
 			retval[j] = newVal;
 		}
 	}
+	ret : 
 	retval[size] = h;
 	return mkPolyArray(retval,size+1);
 }

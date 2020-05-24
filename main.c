@@ -27,7 +27,7 @@ size_t LOADED_FUNCTION_INPUT_SIZE = 0;
 size_t LOADED_FUNCTION_OUTPUT_SIZE = 0;
 
 const char PRE_INCLUDE[] = 
-	"LEX = x_0 \\\\ RLEX = x_1 \\\\ PLEX = x_2\\\\ PRLEX = x_3\\\\ X = 0 \\\\"
+	"NULL = \\\\ LEX = x_0 \\\\ RLEX = x_1 \\\\ PLEX = x_2\\\\ PRLEX = x_3\\\\ X = 0 \\\\"
 	#if BOOLEAN
 	"BCA_PERIODIC = 1 \\\\ BCA_REFLECTIVE = 0 \\\\ BCA_FIXED = 0 \\\\ BCA_FIXED_VALUE = 0 \\\\"
 	"BCA_INITIAL_STATE = (0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,"
