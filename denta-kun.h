@@ -124,7 +124,7 @@ typedef enum _MonomialOrder{
 }MonomialOrder;
 
 typedef struct{
-	size_t sizu; 
+	uint16_t sizu; 
 	K coefficient;
 	union{
 		N *ptr;

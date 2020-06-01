@@ -230,6 +230,7 @@ Poly builtIn_SUB(Poly arg,BlackBoard blackboard){
 		}
 		Poly temp = polyAdd(val,tmp);
 		polyFree(val);
+		polyFree(tmp);
 		val = temp;
 	}
 	polyFree(arg);

@@ -58,6 +58,7 @@ void freeDefinition(mut Definition def){
 	if(def.bytes[0] & 0x80){
 		free(*((char **) &(def.bytes[1])));
 	}
+	polyFree(def.poly);
 }
 
 void freeBlackBoard(mut BlackBoard blackboard){
