@@ -25,6 +25,7 @@ along with Dentakun.  If not, see <http://www.gnu.org/licenses/>.
 #include <ctype.h>
 #include <string.h>
 #include <unistd.h>
+#include <dlfcn.h>
 
 #include <gmp.h>
 
@@ -163,7 +164,7 @@ void _setPolyType(Poly *poly,MonomialOrder);
 
 #if BOOLEAN
 #define termSize(term) (term.sizu)
-#define termFree(term) ((term.sizu <= sizeof(N)*8) ? (term.deg.val = 0) : (free(term.deg.ptr), freeK(term.coefficient),0))
+#define termFree(term) do{ if(term.sizu <= sizeof(N)*8){term.deg.val = 0;}else{free(term.deg.ptr);/*freeK(term.coefficient);*/}}while(0)
 #define termDegree(term,index) ((term.sizu <= sizeof(N)*8) \
 									? ((term.deg.val >> index) & 0x1) \
 									: (N)((term.deg.ptr[index/(sizeof(N)*8)] >> (index % (sizeof(N)*8))) & 0x1))
@@ -184,7 +185,7 @@ void _setPolyType(Poly *poly,MonomialOrder);
 #define termSize(term) (term.sizu)
 #define termDegree(term,index) (term.deg.ptr[index])
 #define termDegreeAllocator(term) (term.deg.ptr = calloc(sizeof(N),term.sizu))
-#define termFree(term) (free(term.deg.ptr),freeK(term.coefficient),0)
+#define termFree(term) do{free(term.deg.ptr);}while(0)
 #define setTermDegree(term,index,value) (term.deg.ptr[index] = value)
 #define setTermSize(term,size) (term.sizu = size)
 #else

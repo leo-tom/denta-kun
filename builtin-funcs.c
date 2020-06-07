@@ -361,6 +361,85 @@ Poly builtIn_EQ(Poly arg,BlackBoard blackboard){
 	return K2Poly(K_1,LEX);
 }
 
+Poly builtIn_RSHIFT(Poly arg,BlackBoard blackboard){
+	if(polyType(arg) != ARRAY){
+		size_t i;
+		for(i = 0;i < polySize(arg);i++){
+			Term term = arg.ptr.terms[i];
+			size_t newSize = termSize(term) - 1;
+			Term newTerm;
+			setTermSize(newTerm,newSize);
+			copyK(newTerm.coefficient,term.coefficient);
+			termDegreeAllocator(newTerm);
+			size_t j;
+			for(j = 1;j < termSize(term);j++){
+				N val = termDegree(term,j);
+				if(val){
+					setTermDegree(newTerm,j - 1,val);
+				}
+			}
+			termFree(term);
+			arg.ptr.terms[i] = newTerm;
+		}
+		Poly retval = polySort(arg,polyType(arg));
+		polyFree(arg);
+		return retval;
+	}else{
+		Poly *array = unwrapPolyArray(arg);
+		size_t i;
+		size_t index = 0;
+		for(i = 0;i < polySize(arg);i++){
+			if(isNullPoly(array[index] = builtIn_RSHIFT(array[i],blackboard))
+				|| isZeroPoly(array[index])){
+				polyFree(array[index]);
+			}else{
+				index++;
+			}
+		}
+		setPolySize(arg,index);
+		return arg;
+	}
+}
+Poly builtIn_LSHIFT(Poly arg,BlackBoard blackboard){
+	if(polyType(arg) != ARRAY){
+		size_t i;
+		for(i = 0;i < polySize(arg);i++){
+			Term term = arg.ptr.terms[i];
+			size_t newSize = termSize(term) + 1;
+			Term newTerm;
+			setTermSize(newTerm,newSize);
+			copyK(newTerm.coefficient,term.coefficient);
+			termDegreeAllocator(newTerm);
+			size_t j;
+			for(j = 0;j + 1 < termSize(term);j++){
+				N val = termDegree(term,j);
+				if(val){
+					setTermDegree(newTerm,j + 1,val);
+				}
+			}
+			termFree(term);
+			arg.ptr.terms[i] = newTerm;
+		}
+		Poly retval = polySort(arg,polyType(arg));
+		polyFree(arg);
+		return retval;
+	}else{
+		Poly *array = unwrapPolyArray(arg);
+		size_t i;
+		size_t index = 0;
+		for(i = 0;i < polySize(arg);i++){
+			if(isNullPoly(array[index] = builtIn_RSHIFT(array[i],blackboard))
+				|| isZeroPoly(array[index])){
+				polyFree(array[index]);
+			}else{
+				index++;
+			}
+		}
+		setPolySize(arg,index);
+		return arg;
+	}
+}
+
 //ABCDEFGHIJKLMNOPQRSTUVWXYZ
 const Function BUILT_IN_FUNCS[] = {
 	{
@@ -399,6 +478,11 @@ const Function BUILT_IN_FUNCS[] = {
 		.funcptr = builtIn_IN
 	},
 	{
+		.name = "LSHIFT",
+		.description = "Shift subscript by one.",
+		.funcptr = builtIn_LSHIFT
+	},
+	{
 		.name = "PAC",
 		.description = "Convert array of polynomials to C code.",
 		.funcptr = builtIn_PAC
@@ -427,6 +511,11 @@ const Function BUILT_IN_FUNCS[] = {
 		.name = "RED",
 		.description = "Reduce polynomial",
 		.funcptr = builtIn_RED
+	},
+	{
+		.name = "RSHIFT",
+		.description = "Shift subscript by one.",
+		.funcptr = builtIn_RSHIFT
 	},
 	{
 		.name = "RZP",
