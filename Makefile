@@ -2,7 +2,8 @@
 
 INSTALL_PATH ?= /usr/local
 DEBUG ?= 0
-DEBUGSTR != if [ $(DEBUG) -eq 1 ] ;  then  echo '-g -fsanitize=address -fno-omit-frame-pointer' ; else echo '-O3' ; fi;
+#DEBUGSTR != if [ $(DEBUG) -ge 1 ] ;  then  echo '-g -fsanitize=address -fno-omit-frame-pointer' ; else echo '-O3' ; fi;
+DEBUGSTR != if [ $(DEBUG) -ge 1 ] ;  then  echo '-g -ggdb' ; else echo '-O3' ; fi;
 OPTS1 =  $(DEBUGSTR) -I/usr/local/include -Wall -DDEBUG=$(DEBUG) -DBOOLEAN=0 -ldl
 OPTS2 =  $(DEBUGSTR) -I/usr/local/include -Wall -DDEBUG=$(DEBUG) -DBOOLEAN=1 -ldl
 SRC = main.c parser.c poly-funcs.c black-board.c builtin-funcs.c K.c bca.c pac.c fgen.c

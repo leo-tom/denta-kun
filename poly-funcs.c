@@ -35,35 +35,29 @@ J.groebner_basis()
 */
 
 extern int _isSameMonomial(unmut Term v1,unmut Term v2);
-extern int _polycmp_LEX(const Term *v1,const Term *v2);
-extern int _polycmp_RLEX(const Term *v1,const Term *v2);
-extern int _polycmp_PLEX(const Term *v1,const Term *v2);
-extern int _polycmp_PRLEX(const Term *v1,const Term *v2);
+
 extern N getDegreeOfATerm(const Term term);
 
 void _setPolySize(Poly *poly,size_t size){
 	poly->size &= ((int64_t)0xf) << 60;
 	poly->size |= (0xfffffffffffffff & size);
 }
-void _setPolyType(Poly *poly,MonomialOrder order){
+void _setPolyType(Poly *poly,PolyType type){
 	poly->size &= 0xfffffffffffffff;
-	if( order == RLEX ){
-		poly->size |= (int64_t)MONOMIAL_ORDER_IN_BIN__RLEX << 60 ;
-	}else if(order == PLEX){
-		poly->size |= (int64_t)MONOMIAL_ORDER_IN_BIN__PLEX << 60;
-	}else if(order == PRLEX){
-		poly->size |= (int64_t)MONOMIAL_ORDER_IN_BIN__PRLEX << 60;
-	}else if(order == ARRAY){ 
-		poly->size |= (int64_t)MONOMIAL_ORDER_IN_BIN__ARRAY << 60;
-	}else{
-		poly->size |= (int64_t)MONOMIAL_ORDER_IN_BIN__LEX << 60;
+	switch(type){
+		case POLY : {
+			poly->size |= (int64_t)POLYTYPE_POLY << 60 ;
+		}break;
+		case ARRAY : {
+			poly->size |= (int64_t)POLYTYPE_ARRAY << 60 ;
+		}
 	}
 }
 
-Poly K2Poly(unmut K k,MonomialOrder order){
+Poly K2Poly(unmut K k){
 	Poly retval;
 	setPolySize(retval,1);
-	setPolyType(retval,order);
+	setPolyType(retval,POLY);
 	retval.ptr.terms = malloc(sizeof(Term));
 	setTermSize(retval.ptr.terms[0],0);
 	termDegreeAllocator(retval.ptr.terms[0]);
@@ -132,7 +126,7 @@ Poly polyDup(unmut Poly poly){
 }
 
 double poly2Double(unmut Poly poly){
-	if(poly.size != 1 || termSize(poly.ptr.terms[0]) > 0){
+	if(polyType(poly) == ARRAY || polySize(poly) != 1 || termSize(poly.ptr.terms[0]) > 0){
 		fprintf(stderr,"Trying to call poly2Double to : ");polyPrint(poly,K2str,stderr);fprintf(stderr,"\n");
 		DIE;
 	}
@@ -200,10 +194,10 @@ void polyPrint(unmut Poly poly,char*(*printer)(K),FILE *fp){
 			}
 			free(buff);
 		}
-		size_t i;
+		int64_t i;
 		for(i = 0; i < termSize(term);i++){
 			if(termDegree(term,i)){
-				fprintf(fp,"x_{%ld}",i+SUBSHIFT);
+				fprintf(fp,"x_{%ld}",i - SUBSHIFT);
 				if(termDegree(term,i) == 1){
 					fprintf(fp," ");
 				}else{
@@ -217,7 +211,7 @@ Poly term2Poly(mut Term term){
 	Poly retval = {.size = 0};
 	retval.ptr.terms = malloc(sizeof(Term));
 	setPolySize(retval,1);
-	setPolyType(retval,LEX);
+	setPolyType(retval,POLY);
 	retval.ptr.terms[0].deg = term.deg;
 	retval.ptr.terms[0].sizu = term.sizu;
 	copyK(retval.ptr.terms[0].coefficient, term.coefficient);
@@ -235,43 +229,31 @@ Term _polyIn(unmut Poly poly){
 }
 Poly polyIn(unmut Poly poly){
 	Poly retval = term2Poly(_polyIn(poly));
-	MonomialOrder order = polyType(poly);
-	setPolyType(retval,order);
 	return retval;
 }
-int cmpTerm(MonomialOrder order,Term v1,Term v2){
-	int (*cmp)(const Term *,const Term *) = NULL;
-	switch(order){
-		case LEX : {cmp = _polycmp_LEX;break;}
-		case RLEX : {cmp = _polycmp_RLEX;break;}
-		case PLEX : {cmp = _polycmp_PLEX;break;}
-		case PRLEX : {cmp = _polycmp_PRLEX;break;}
-		default   : { DIE;}
-	}
-	return cmp(&v1,&v2);
+int cmpTerm(const Term v1,const Term v2){
+	return _cmpTerm(&v1,&v2);
 }
 int polyCmp(unmut Poly v1,unmut Poly v2){
-	if(polyType(v1) != polyType(v2)){
-		fprintf(stderr,"You cannot compare polies whose polynomial order are different.\n");
-		DIE;
-	}
-	MonomialOrder order = polyType(v1);
-	if(order == ARRAY){
+	if(polyType(v1) == ARRAY || polyType(v2) == ARRAY){
+		fprintf(stderr,"You cannot compare arrays.\n");
 		DIE;
 	}
 	size_t size = polySize(v1) > polySize(v2) ? polySize(v2) : polySize(v1);
 	size_t i;
 	for(i = 0;i < size;i++){
-		int val = cmpTerm(order,v1.ptr.terms[i],v2.ptr.terms[i]);
+		int val = cmpTerm(v1.ptr.terms[i],v2.ptr.terms[i]);
 		if( val != 0 ){
 			return val;
+		}else if(cmpK(v1.ptr.terms[i].coefficient,v2.ptr.terms[i].coefficient)){
+			return cmpK(v1.ptr.terms[i].coefficient,v2.ptr.terms[i].coefficient);
 		}
 	}
 	return 0;
 }
 Poly polyAdd(unmut Poly v1,unmut Poly v2){
-	if(polyType(v1) != polyType(v2)){
-		fprintf(stderr,"Trying to add Poly sorted by different monomial order\n");
+	if(polyType(v1) == ARRAY || polyType(v2) == ARRAY){
+		fprintf(stderr,"You cant add arrays\n");
 		DIE;
 	}
 	if(isNullPoly(v1) || isNullPoly(v2)){
@@ -282,21 +264,14 @@ Poly polyAdd(unmut Poly v1,unmut Poly v2){
 	}else if(isZeroPoly(v2)){
 		return polyDup(v1);
 	}
-	int (*cmp)(const Term *v1,const Term *v2) = NULL;
-	switch(polyType(v1)){
-		case LEX : {cmp = _polycmp_LEX;break;}
-		case RLEX : {cmp = _polycmp_RLEX;break;}
-		case PLEX : {cmp = _polycmp_PLEX;break;}
-		case PRLEX : {cmp = _polycmp_PRLEX;break;}
-		default   : { DIE;}
-	}
+
 	int i,j,index;
 	i = j = index = 0;
 	Poly retval = {
 		.ptr.terms = malloc(sizeof(Term) * (polySize(v1) + polySize(v2)))
 	};
 	setPolySize(retval,(polySize(v1) + polySize(v2)));
-	setPolyType(retval,polyType(v1));
+	setPolyType(retval,POLY);
 	int someThingDisappeared = 0;
 	while(i < polySize(v1) || j < polySize(v2)){
 		int cmpVal;
@@ -305,7 +280,7 @@ Poly polyAdd(unmut Poly v1,unmut Poly v2){
 		}else if(j >= polySize(v2)){
 			cmpVal = +1;
 		}else{
-			cmpVal = cmp(&v1.ptr.terms[i],&v2.ptr.terms[j]);
+			cmpVal = cmpTerm(v1.ptr.terms[i],v2.ptr.terms[j]);
 		}
 		if(cmpVal > 0){
 			retval.ptr.terms[index++] = dupTerm(v1.ptr.terms[i++]);
@@ -334,19 +309,23 @@ Poly polyAdd(unmut Poly v1,unmut Poly v2){
 	return retval;
 }
 Poly polySub(unmut Poly v1,unmut Poly v2){
+	#if !BOOLEAN
 	size_t i;
 	for(i = 0;i < polySize(v2);i++){
 		mulK(v2.ptr.terms[i].coefficient,v2.ptr.terms[i].coefficient,K_N1);
 	}
+	#endif
 	Poly retval = polyAdd(v1,v2);
+	#if !BOOLEAN
 	for(i = 0;i < polySize(v2);i++){
 		mulK(v2.ptr.terms[i].coefficient,v2.ptr.terms[i].coefficient,K_N1);
 	}
+	#endif
 	return retval;
 }
 Poly polyMul(unmut Poly v1,unmut Poly v2){
-	if(polyType(v1) != polyType(v2)){
-		fprintf(stderr,"Trying to multiply Poly sorted by different monomial order\n");
+	if(polyType(v1) == ARRAY || polyType(v2) == ARRAY){
+		fprintf(stderr,"You can't multiply arrays\n");
 		DIE;
 	}
 	if(isNullPoly(v1) || isNullPoly(v2)){
@@ -355,8 +334,13 @@ Poly polyMul(unmut Poly v1,unmut Poly v2){
 	if(isZeroPoly(v1) || isZeroPoly(v2)){
 		return polyDup(zeroPoly);
 	}
+	if(!polyCmp(v1,onePoly)){
+		return polyDup(v2);
+	}else if(!polyCmp(v2,onePoly)){
+		return polyDup(v1);
+	}
 	
-	int i,j,k,index;
+	int64_t i,j,k,index;
 	if(polySize(v1) == 0 || polySize(v2) == 0){
 		fprintf(stderr,"This should not be happening\n");
 		DIE;
@@ -387,15 +371,16 @@ Poly polyMul(unmut Poly v1,unmut Poly v2){
 					setTermDegree(retval.ptr.terms[index],k,deg);
 				#endif
 			}
+			#if !BOOLEAN
 			mulK(retval.ptr.terms[index].coefficient,retval.ptr.terms[index].coefficient, smaller.coefficient);
+			#endif
 			index++;			
 		}
 	}
-	MonomialOrder order = polyType(v1);
 	setPolySize(retval,index);
-	setPolyType(retval,order);
+	setPolyType(retval,POLY);
 	Poly tmp = retval;
-	retval = polySort(tmp,order);
+	retval = polySort(tmp);
 	polyFree(tmp);
 	return retval;
 }
@@ -423,7 +408,6 @@ int _isDiviable(unmut Term dividend,unmut Term divisor){
 /*divisor must be array of Poly whose length is 'size'*/
 Poly polyDiv(unmut Poly dividend,unmut Poly divisors){
 	int i,j,k;
-	MonomialOrder order = polyType(dividend);
 	size_t size;
 	Poly h = polyDup(dividend);
 	Poly *divisor;
@@ -435,20 +419,16 @@ Poly polyDiv(unmut Poly dividend,unmut Poly divisors){
 		size = 1;
 	}
 	Term *in_g = malloc(sizeof(Term) * size);
-	int error = 1;
 	for(i = 0;i < size;i++){
-		in_g[i] = __polyIn(divisor[i]);
-		if(error && !isZeroPoly(divisor[i])){
-			error = 0;
+		if(isZeroPoly(divisor[i]) || isNullPoly(divisor[i])){
+			fprintf(stderr,"Division by zero or NULL\n");
+			DIE;
 		}
+		in_g[i] = __polyIn(divisor[i]);
 	}
 	Poly *retval = malloc(sizeof(Poly) * (size + 1));
 	for(i = 0;i < size;i++){
 		retval[i] = polyDup(zeroPoly);
-		setPolyType(retval[i],order);
-	}
-	if(error){
-		goto ret;
 	}
 	while(!isZeroPoly(h)){
 		for(i = 0;i < polySize(h);i++){
@@ -489,7 +469,6 @@ Poly polyDiv(unmut Poly dividend,unmut Poly divisors){
 			divK(w.coefficient,u.coefficient , g.coefficient);
 			mulK(w.coefficient,w.coefficient , K_N1);
 			Poly tmp = term2Poly(w);
-			setPolyType(tmp,order);
 			Poly temp = polyMul(tmp,divisor[j]);
 			Poly tempo = polyAdd(h,temp);
 			polyFree(h);
@@ -501,7 +480,6 @@ Poly polyDiv(unmut Poly dividend,unmut Poly divisors){
 			retval[j] = newVal;
 		}
 	}
-	ret : 
 	retval[size] = h;
 	return mkPolyArray(retval,size+1);
 }
@@ -530,9 +508,7 @@ N __max(Term x,Term y,size_t index){
 }
 
 Poly polyS(unmut Poly f,unmut Poly g){
-	MonomialOrder order = polyType(f);
-	if(order != polyType(g)){
-		fprintf(stderr,"S polynomial of different polynomials cannnot be computed\n");
+	if(polyType(f) == ARRAY || polyType(g) == ARRAY){
 		DIE;
 	}
 	Term in_f = __polyIn(f);
@@ -586,8 +562,8 @@ Poly polyS(unmut Poly f,unmut Poly g){
 	divK(w_g.coefficient,K_1,in_g.coefficient);
 	Poly w_f_p = term2Poly(w_f);
 	Poly w_g_p = term2Poly(w_g);
-	setPolyType(w_f_p,order);
-	setPolyType(w_g_p,order);
+	setPolyType(w_f_p,POLY);
+	setPolyType(w_g_p,POLY);
 	Poly tmp_f = polyMul(w_f_p,f); polyFree(w_f_p);
 	Poly tmp_g = polyMul(w_g_p,g); polyFree(w_g_p);
 	Poly retval = polySub(tmp_f,tmp_g); polyFree(tmp_f);polyFree(tmp_g);
@@ -692,32 +668,15 @@ int _polycmp_PRLEX(const Term *_v1,const Term *_v2){
 	}
 	return 0;
 }
+
 // v1 > v2 => -1
-int polyCMP_LEX(const Term *v1,const Term *v2){
-	return -1*_polycmp_LEX(v1,v2);
+int _cmpTerm_r(const Term *v1,const Term *v2){
+	return -1*_cmpTerm(v1,v2);
 }
-int polyCMP_RLEX(const Term *v1,const Term *v2){
-	return -1*_polycmp_RLEX(v1,v2);
-}
-int polyCMP_PLEX(const Term *v1,const Term *v2){
-	return -1*_polycmp_PLEX(v1,v2);
-}
-int polyCMP_PRLEX(const Term *v1,const Term *v2){
-	return -1*_polycmp_PRLEX(v1,v2);
+int cmpTerm_r(const Term v1,const Term v2){
+	return -1*cmpTerm(v1,v2);
 }
 
-int _isSameMonomial(unmut Term v1,unmut Term v2){
-	if(termSize(v1) != termSize(v2)){
-		return 0;
-	}
-	size_t i;
-	for(i=0;i < termSize(v1);i++){
-		if(termDegree(v1,i) != termDegree(v2,i)){
-			return 0;
-		}
-	}
-	return 1;
-}
 
 void polyNice(unmut Poly p){
 	#if BOOLEAN
@@ -739,30 +698,20 @@ void polyNice(unmut Poly p){
 	#endif
 }
 
-Poly polySort(unmut Poly poly,MonomialOrder order){
+Poly polySort(unmut Poly poly){
 	if(polyType(poly) == ARRAY){
 		size_t size = polySize(poly);
 		size_t i;
 		Poly *source = unwrapPolyArray(poly);
  		Poly *ptr = malloc(size * sizeof(Poly));
 		for(i = 0;i < size;i++){
-			ptr[i] = polySort(source[i],order);
+			ptr[i] = polySort(source[i]);
 		}
 		return mkPolyArray(ptr,size);
 	}
 	Poly toBeSorted = polyDup(poly);
 	size_t size = polySize(toBeSorted);
-	switch(order){
-		case LEX : {qsort(toBeSorted.ptr.terms,size,sizeof(Term)
-					,(int (*)(const void *,const void *))polyCMP_LEX); setPolyType(toBeSorted,LEX); break;}
-		case RLEX : {qsort(toBeSorted.ptr.terms,size,sizeof(Term)
-					,(int (*)(const void *,const void *))polyCMP_RLEX); setPolyType(toBeSorted,RLEX); break;}
-		case PLEX : {qsort(toBeSorted.ptr.terms,size,sizeof(Term)
-					,(int (*)(const void *,const void *))polyCMP_PLEX); setPolyType(toBeSorted,PLEX); break;}
-		case PRLEX : {qsort(toBeSorted.ptr.terms,size,sizeof(Term)
-					,(int (*)(const void *,const void *))polyCMP_PRLEX); setPolyType(toBeSorted,PRLEX); break;}
-		default   : { DIE;}
-	}
+	qsort(toBeSorted.ptr.terms,size,sizeof(Term),(int (*)(const void *,const void *))_cmpTerm_r);
 	Poly retval = {
 		.size = toBeSorted.size, /*Copy entire toBeSorted.size. That is, both type of monomial order and size of terms*/
 		.ptr.terms = malloc(sizeof(Term) * polySize(toBeSorted))
@@ -772,7 +721,7 @@ Poly polySort(unmut Poly poly,MonomialOrder order){
 	size_t i,j;
 	for(i = 0;i < size;i++){
 		retval.ptr.terms[index] = toBeSorted.ptr.terms[i];
-		for(j = i + 1;j < size && _isSameMonomial(toBeSorted.ptr.terms[i],toBeSorted.ptr.terms[j]);j++){
+		for(j = i + 1;j < size && !cmpTerm(toBeSorted.ptr.terms[i],toBeSorted.ptr.terms[j]);j++){
 			addK(retval.ptr.terms[index].coefficient,
 				retval.ptr.terms[index].coefficient, toBeSorted.ptr.terms[j].coefficient);
 			termFree(toBeSorted.ptr.terms[j]);
@@ -789,7 +738,6 @@ Poly polySort(unmut Poly poly,MonomialOrder order){
 	if(index == 0 && someThingDisappeared){
 		free(retval.ptr.terms);
 		retval = polyDup(zeroPoly);
-		setPolyType(retval,order);
 	}else if(polySize(retval) != index){
 		retval.ptr.terms = realloc(retval.ptr.terms,sizeof(Term)*index);
 		setPolySize(retval,index);
@@ -806,7 +754,7 @@ Poly mkPolyArray(mut Poly *array,size_t size){
 }
 Poly * unwrapPolyArray(mut Poly poly){
 	if(polyType(poly)!=ARRAY){
-		return NULL;
+		DIE;
 	}
 	return poly.ptr.polies;
 }
@@ -913,7 +861,7 @@ Poly isThisGrobnerBasis(Poly array){
 			}
 		}
 	}
-	reminder = K2Poly(K_0,polyType(ptr[0]));
+	reminder = K2Poly(K_0);
 	ret:
 	return reminder;
 }

@@ -21,13 +21,16 @@ along with Dentakun.  If not, see <http://www.gnu.org/licenses/>.
 #include <dlfcn.h>
 
 FILE *OUTFILE = NULL;
-size_t SUBSHIFT = 0;
+int64_t SUBSHIFT = 0;
+int MONOMIAL_ORDER=0;
+int (*_cmpTerm)(const Term *v1,const Term *v2) = _polycmp_LEX;
 void *LOADED_FUNCTION_PTR = NULL;
 size_t LOADED_FUNCTION_INPUT_SIZE = 0;
 size_t LOADED_FUNCTION_OUTPUT_SIZE = 0;
+Poly onePoly;
 
 const char PRE_INCLUDE[] = 
-	"NULL = \\\\ null = \\\\ LEX = x_0 \\\\ RLEX = x_1 \\\\ PLEX = x_2\\\\ PRLEX = x_3\\\\ X = 0 \\\\"
+	"NULL = \\\\ null = \\\\ X = 0 \\\\"
 	#if BOOLEAN
 	"BCA_PERIODIC = 1 \\\\ BCA_REFLECTIVE = 0 \\\\ BCA_FIXED = 0 \\\\ BCA_FIXED_VALUE = 0 \\\\"
 	"BCA_INITIAL_STATE = (0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,"
@@ -61,18 +64,59 @@ BlackBoard readPreInclude(BlackBoard blackboard){
 	return blackboard;
 }
 
+size_t polySizeInByte(Poly p){
+	size_t retval = 0;
+	size_t i;
+	if(polyType(p) == ARRAY){
+		Poly *array = unwrapPolyArray(p);
+		for(i = 0;i < polySize(p);i++){
+			retval += polySizeInByte(array[i]);
+		}
+	}else{
+		for(i = 0;i < polySize(p);i++){
+			#if BOOLEAN
+				retval += termSize(p.ptr.terms[i])/sizeof(N) + 1;
+			#elif RATIONAL
+				retval += sizeof(N)*termSize(p.ptr.terms[i]);
+			#else
+				#error Nope.
+			#endif
+			retval += sizeof(Term);
+		}
+	}
+	return retval;
+}
+
 #include <time.h>
 int main(int argc,char *argv[]){
 	initConst();
 	OUTFILE = stdout;
 	FILE *infile = stdin;
-	const char optstr[] = "s:l:f:";
+	const char optstr[] = "s:l:f:i:o:m:";
 	opterr = 0;
 	int c;
 	void *dlopen_handle = NULL;
 	char *functionName = NULL;
 	while((c = getopt(argc,argv,optstr)) != -1){
 		switch(c){
+			case 'm':{
+				if(!strcmp(optarg,"LEX") ){
+					MONOMIAL_ORDER = MONOMIAL_ORDER_LEX;
+					_cmpTerm = _polycmp_LEX;
+				}else if(!strcmp(optarg,"RLEX") ){
+					MONOMIAL_ORDER = MONOMIAL_ORDER_RLEX;
+					_cmpTerm = _polycmp_RLEX;
+				}else if(!strcmp(optarg,"PLEX") ){
+					MONOMIAL_ORDER = MONOMIAL_ORDER_PLEX;
+					_cmpTerm = _polycmp_PLEX;
+				}else if(!strcmp(optarg,"PRLEX") ){
+					MONOMIAL_ORDER = MONOMIAL_ORDER_PRLEX;
+					_cmpTerm = _polycmp_PRLEX;
+				}else{
+					fprintf(stderr,"Unknown monomial order \"%s\"\n",optarg);
+					DIE;
+				}
+			}break;
 			case 's':
 			{
 				SUBSHIFT = atoi(optarg);
@@ -109,6 +153,7 @@ int main(int argc,char *argv[]){
 		}
 	}
 	copyK(zeroPoly.ptr.terms[0].coefficient,K_0);
+	onePoly = K2Poly(K_1);
 	BlackBoard blackboard = readPreInclude(mkBlackBoard());
 	if(LOADED_FUNCTION_PTR != NULL){
 		if(LOADED_FUNCTION_INPUT_SIZE == 0 || LOADED_FUNCTION_OUTPUT_SIZE == 0){
@@ -129,26 +174,8 @@ int main(int argc,char *argv[]){
 		#else 
 			poly = parser(infile,&blackboard);
 			cmdNumber++;
-			if(polyType(poly) != ARRAY){
-				size_t size = 0;
-				size_t i;
-				for(i = 0;i < polySize(poly);i++){
-					#if BOOLEAN
-					size += termSize(poly.ptr.terms[i])/sizeof(N) + 1;
-					#elif RATIONAL
-					size += sizeof(N)*termSize(poly.ptr.terms[i]);
-					#else
-					#error Nope.
-					#endif
-					size += sizeof(Term);
-				}
-				#if DEBUG == 1
-				fprintf(stderr,"%lu => sizeof({.size == %lu,.type == %d}) == %lu\n",cmdNumber,polySize(poly),polyType(poly),size);
-				#elif DEBUG >= 2
-				polyPrint(poly,K2str,stderr);
-				fprintf(stderr," => sizeof({.size == %lu,.type == %d}) == %lu\n",polySize(poly),polyType(poly),size);
-				#endif
-			}
+			polyPrint(poly,K2str,stderr);
+			fprintf(stderr," => %lu\n",polySizeInByte(poly));
 		#endif
 		if(blackboardSize == blackboard.size){
 			//parser did not define anything.

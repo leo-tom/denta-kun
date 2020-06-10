@@ -69,10 +69,16 @@ typedef Numeric K;
 typedef Natural N;
 
 extern FILE *OUTFILE;
-extern size_t SUBSHIFT;
+extern int64_t SUBSHIFT;
+extern int MONOMIAL_ORDER;
 extern void *LOADED_FUNCTION_PTR;
 extern size_t LOADED_FUNCTION_INPUT_SIZE;
 extern size_t LOADED_FUNCTION_OUTPUT_SIZE;
+
+#define MONOMIAL_ORDER_LEX (0)
+#define MONOMIAL_ORDER_RLEX (1)
+#define MONOMIAL_ORDER_PLEX (2)
+#define MONOMIAL_ORDER_PRLEX (3)
 
 extern K JOHO_NO_TANIGEN; //1
 extern K KAHO_NO_TANIGEN; //0
@@ -116,13 +122,13 @@ void divK(K val,const K v1,const K v2);
 #error Nope. 
 #endif
 
-typedef enum _MonomialOrder{
-	LEX,
-	RLEX,
-	PLEX,
-	PRLEX,
+typedef enum {
+	POLY,
 	ARRAY
-}MonomialOrder;
+}PolyType;
+
+#define POLYTYPE_POLY (0)
+#define POLYTYPE_ARRAY (1)
 
 typedef struct{
 	uint16_t sizu; 
@@ -136,7 +142,7 @@ typedef struct{
 typedef struct __Poly__{
 	/*Assume size_t is 64 bit long. If not, this is not gonna work.*/
 	/*lower 60 bits are used to store size of an array *items*/
-	/*upper 4 bits are used to store monomial order that is used in this Poly.*/
+	/*upper 4 bits are used to store polytype*/
 	size_t size;
 	union{
 		Term *terms;
@@ -144,40 +150,39 @@ typedef struct __Poly__{
 	}ptr;
 }Poly;
 
-#define MONOMIAL_ORDER_IN_BIN__LEX (0)
-#define MONOMIAL_ORDER_IN_BIN__RLEX (1)
-#define MONOMIAL_ORDER_IN_BIN__PLEX (2)
-#define MONOMIAL_ORDER_IN_BIN__PRLEX (3)
-#define MONOMIAL_ORDER_IN_BIN__ARRAY (4)
+extern int (*_cmpTerm)(const Term *v1,const Term *v2);
+extern int cmpTerm(const Term v1,const Term v2);
+extern int _cmpTerm_r(const Term *v1,const Term *v2);
+extern int cmpTerm_r(const Term v1,const Term v2);
+extern int _polycmp_LEX(const Term *v1,const Term *v2);
+extern int _polycmp_RLEX(const Term *v1,const Term *v2);
+extern int _polycmp_PLEX(const Term *v1,const Term *v2);
+extern int _polycmp_PRLEX(const Term *v1,const Term *v2);
 
 void _setPolySize(Poly *poly,size_t size);
-void _setPolyType(Poly *poly,MonomialOrder);
+void _setPolyType(Poly *poly,PolyType);
 
 #define polySize(p) ((p).size & 0xfffffffffffffff)
-#define polyType(p) ((p).size >> 60 == MONOMIAL_ORDER_IN_BIN__RLEX ? RLEX : ( \
-					 (p).size >> 60 == MONOMIAL_ORDER_IN_BIN__PLEX ? PLEX : ( \
-					 (p).size >> 60 == MONOMIAL_ORDER_IN_BIN__PRLEX ? PRLEX : ( \
-					 (p).size >> 60 == MONOMIAL_ORDER_IN_BIN__LEX ? LEX : ARRAY))))
-
+#define polyType(p) ((p).size >> 60 == POLYTYPE_POLY ? POLY : ARRAY)
 #define setPolySize(polynomial,newSize) _setPolySize(&polynomial,newSize)
 #define setPolyType(polynomial,typeToBeSet) _setPolyType(&polynomial,typeToBeSet)
 
 #if BOOLEAN
 #define termSize(term) (term.sizu)
-#define termFree(term) do{ if(term.sizu <= sizeof(N)*8){term.deg.val = 0;}else{free(term.deg.ptr);/*freeK(term.coefficient);*/}}while(0)
-#define termDegree(term,index) ((term.sizu <= sizeof(N)*8) \
-									? ((term.deg.val >> index) & 0x1) \
-									: (N)((term.deg.ptr[index/(sizeof(N)*8)] >> (index % (sizeof(N)*8))) & 0x1))
-#define termDegreeAllocator(term) ((term.sizu <= sizeof(N)*8) ? (term.deg.val = 0,NULL) \
-									: (term.deg.ptr = calloc(sizeof(N),(term.sizu-1)/(sizeof(N)*8) + 1)))
+#define termFree(term) do{ if(term.sizu <= sizeof(N)*8){term.deg.val = 0;}else{free(term.deg.ptr);}}while(0)
+#define termDegree(term,index) ((term.sizu < sizeof(N)*8) \
+									? ((term.deg.val >> (index)) & 0x1) \
+									: (N)((term.deg.ptr[(index)/(sizeof(N)*8)] >> ((index) % (sizeof(N)*8))) & 0x1))
+#define termDegreeAllocator(term) ((term.sizu < sizeof(N)*8) ? (term.deg.val = 0,NULL) \
+									: (term.deg.ptr = calloc(sizeof(N),term.sizu/(sizeof(N)*8) + 1)))
 #define setTermDegree(term,index,value) (value ? \
-											((term.sizu <= sizeof(N)*8) \
-												? (term.deg.val |= (1 << index))\
-												: (term.deg.ptr[index/(sizeof(N)*8)] |= (1 << (index % (sizeof(N)*8)))) \
+											((term.sizu < sizeof(N)*8) \
+												? (term.deg.val |= ((N)1 << (index))) \
+												: (term.deg.ptr[(index)/(sizeof(N)*8)] |= (1 << ((index) % (sizeof(N)*8)))) \
 											)\
-											:((term.sizu <= sizeof(N)*8) \
-												? (term.deg.val &= ~(1 << index))\
-												: ((term.deg.ptr[index/(sizeof(N)*8)] &= (~(1 << (index % (sizeof(N)*8)))))) \
+											:((term.sizu < sizeof(N)*8) \
+												? (term.deg.val &= ~(1 << (index))) \
+												: ((term.deg.ptr[(index)/(sizeof(N)*8)] &= (~(1 << ((index) % (sizeof(N)*8)))))) \
 											))
 											
 #define setTermSize(term,size) (term.sizu = size)
@@ -222,6 +227,7 @@ Poly cfunc2Poly(size_t inputSize,size_t outputSize,BlackBoard blackboard);
 
 extern const Poly nullPoly;
 extern Poly zeroPoly;
+extern Poly onePoly;
 extern Definition nullDefinition;
 int isNullPoly(unmut Poly poly);
 int isNullDefinition(unmut Definition definition);
@@ -250,7 +256,7 @@ Poly polyS(unmut Poly f,unmut Poly g);
 void polyNice(unmut Poly p);
 int polyCmp(unmut Poly v1,unmut Poly v2);
 
-Poly K2Poly(mut K k,MonomialOrder order);
+Poly K2Poly(mut K k);
 #define poly2K(k,poly) ((polyType(poly) == ARRAY || polySize(poly) != 1 || termSize(poly.ptr.terms[0]) != 0) ? \
 		(fprintf(stderr, "Unable to call poly2K on : "),polyPrint(poly,K2str,stderr),fprintf(stderr,"\n"),exit(1),k) : \
 		copyK(k,poly.ptr.terms[0].coefficient))
@@ -259,10 +265,9 @@ N polyDegrees(unmut Poly p);
 Term __polyIn(unmut Poly poly);
 Term _polyIn(unmut Poly poly);
 Term dupTerm(unmut Term);
-int cmpTerm(MonomialOrder order,Term v1,Term v2);
 Poly polyIn(unmut Poly poly);
 Poly term2Poly(mut Term);
-Poly polySort(unmut Poly poly,MonomialOrder order);
+Poly polySort(unmut Poly poly);
 void polyPrint(unmut Poly poly,char*(*printer)(K ),FILE *fp);
 //Poly appendTerm2Poly(mut Poly poly,mut Term);
 double poly2Double(unmut Poly poly);

@@ -7,11 +7,13 @@ then
 	export VARIABLE_SIZE=3
 fi
 shift
-if which gawk > /dev/null
+AWK="$(which gawk) -M "
+if [ -z "$AWK" ]
 then
-	export AWK='gawk -M '
-else
-	export AWK='awk '
+	AWK='awk '
 fi
+
+export AWK
+
 $DIR$PRGNAME $@
 

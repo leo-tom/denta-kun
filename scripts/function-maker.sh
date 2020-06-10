@@ -20,7 +20,7 @@ if [ $# -eq 1 ]
 then
 	NUMBER="$1"
 else
-	echo "function-maker requires 1 variables."
+	echo "function-maker requires at least 1 variables."
 	exit 1
 fi
 

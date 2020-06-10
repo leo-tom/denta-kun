@@ -122,51 +122,7 @@ Poly builtIn_RED(Poly arg,BlackBoard blackboard){
 	polyFree(arg);
 	return result;
 }
-Poly builtIn_SRT(Poly arg,BlackBoard blackboard){
-	Poly *array;
-	size_t size;
-	if(polyType(arg) == ARRAY){
-		array = unwrapPolyArray(arg);
-		size = polySize(arg);
-	}else{
-		polyFree(arg);
-		return nullPoly;
-	}
 
-	MonomialOrder order;
-	if(polySize(array[0]) != 1){
-		fprintf(stderr,"Invalid MonomialOrder \n ");
-		DIE;
-	}
-	switch (termSize(array[0].ptr.terms[0])) {
-		case MONOMIAL_ORDER_IN_BIN__LEX: {order = LEX;break;}
-		case MONOMIAL_ORDER_IN_BIN__RLEX: {order = RLEX;break;}
-		case MONOMIAL_ORDER_IN_BIN__PLEX: {order = PLEX;break;}
-		case MONOMIAL_ORDER_IN_BIN__PRLEX: {order = PRLEX;break;}
-		default :{
-			fprintf(stderr,"Unknown monomial order : ");
-			polyPrint(array[0],K2str,stderr);
-			DIE;
-		}
-	}
-	
-	size--;
-	array++;
-	Poly *ptr = malloc(size * sizeof(Poly));
-	size_t i;
-	for(i = 0;i < size;i++){
-		ptr[i] = polySort(array[i],order);
-	}
-	Poly retval;
-	if(size == 1){
-		retval = ptr[0];
-		free(ptr);
-	}else{
-		retval = mkPolyArray(ptr,size);
-	}
-	polyFree(arg);
-	return retval;
-}
 #include <sys/time.h>
 Poly builtIn_CLOCK(Poly arg,BlackBoard blackboard){
 	polyFree(arg);
@@ -189,7 +145,7 @@ Poly builtIn_CLOCK(Poly arg,BlackBoard blackboard){
 	mpq_set_si(kmic,tval.tv_usec,1);
 	mulK(k,ksec,shifter);
 	addK(k,k,kmic);
-	Poly retval = K2Poly(k,LEX);
+	Poly retval = K2Poly(k);
 	freeK(k);
 	freeK(ksec);
 	freeK(kmic);
@@ -198,34 +154,57 @@ Poly builtIn_CLOCK(Poly arg,BlackBoard blackboard){
 	#endif
 }
 Poly builtIn_SUB(Poly arg,BlackBoard blackboard){
-	if(polyType(arg) != ARRAY || polySize(arg) != 2){
+	if(polyType(arg) != ARRAY || polySize(arg) == 0){
 		goto err;
 	}
-	Poly poly = unwrapPolyArray(arg)[0];
-	Poly __values = unwrapPolyArray(arg)[1];
-	Poly *values;
+	Poly *array = unwrapPolyArray(arg);
+	Poly poly = array[0];
 	size_t size;
-	if(polyType(__values) != ARRAY){
-		size = 1;
-		values = &__values;
-	}else{
-		size = polySize(__values);
-		values = unwrapPolyArray(__values);
-	}
-	int i,j,k;
-	Poly val = polyDup(zeroPoly);
-	for(i = 0;i < polySize(poly);i++){
-		Poly tmp = K2Poly(poly.ptr.terms[i].coefficient,polyType(poly));
-		for(j = 0;j < termSize(poly.ptr.terms[i]);j++){
-			if(termDegree(poly.ptr.terms[i],j)){
-				if(j >= size){
+	BlackBoard map = mkBlackBoard();
+	int64_t i,j,k;
+	for(i = 1;i < polySize(arg);i++){
+		Poly tuple = array[i];
+		if(polyType(tuple) != ARRAY || polySize(tuple) != 2){
+			goto err;
+		}
+		Poly left = unwrapPolyArray(tuple)[0];
+		Poly right = unwrapPolyArray(tuple)[1];
+		if(polyType(left) == ARRAY || polySize(left) != 1){
+			goto err;
+		}
+		int64_t index = -1;
+		Term term = left.ptr.terms[0];
+		for(j = 0;j < termSize(term);j++ ){
+			if(termDegree(term,j)){
+				if(index >= 0){
 					goto err;
 				}
-				for(k = 0;k < termDegree(poly.ptr.terms[i],j);k++){
-					Poly temp = polyMul(tmp,values[j]);
+				index = j;
+			}
+		}
+		char buff[16];
+		size = sprintf(buff,"%ld",index);
+		map = insert2BlackBoard(map,mkDefinition(buff,size,polyDup(right)));
+	}
+	Poly val = polyDup(zeroPoly);
+	for(i = 0;i < polySize(poly);i++){
+		Term term = poly.ptr.terms[i];
+		Poly tmp = K2Poly(term.coefficient);
+		for(j = 0;j < termSize(term);j++){
+			if(termDegree(term,j)){
+				char buff[16];
+				size = sprintf(buff,"%ld",j);
+				Poly value = findFromBlackBoard(map,buff,size);
+				if(isNullPoly(value)){
+					fprintf(stderr,"I don't know what to do with x_{%ld}.\n",j);
+					goto err;
+				}
+				for(k = 0;k < termDegree(term,j);k++){
+					Poly temp = polyMul(tmp,value);
 					polyFree(tmp);
 					tmp = temp;
 				}
+				polyFree(value);
 			}
 		}
 		Poly temp = polyAdd(val,tmp);
@@ -234,10 +213,11 @@ Poly builtIn_SUB(Poly arg,BlackBoard blackboard){
 		val = temp;
 	}
 	polyFree(arg);
+	freeBlackBoard(map);
 	return val;
 	err : 
-	fprintf(stderr,"builtIn_SUB expects 2 arrays as argument.\n");
-	fprintf(stderr,"...or, you did not give me enough values to substitute.\n");
+	fprintf(stderr,"That is not how you use \\SUB. \n");
+	fprintf(stderr,"You gave me : ");
 	polyPrint(arg,K2str,stderr);
 	fprintf(stderr,"\n");
 	DIE;
@@ -273,8 +253,8 @@ Poly builtIn_DIV(Poly arg,BlackBoard blackboard){
 }
 Poly builtIn_DIE(Poly arg,BlackBoard blackboard){
 	polyFree(arg);
-	fprintf(stderr,"built-in function \"DIE\" is called.\n");
-	fprintf(stderr,"bye bye.\n");
+	//fprintf(stderr,"built-in function \"DIE\" is called.\n");
+	//fprintf(stderr,"bye bye.\n");
 	exit(0);
 }
 Poly builtIn_IN(Poly arg,BlackBoard blackboard){
@@ -321,25 +301,13 @@ Poly builtIn_EQ(Poly arg,BlackBoard blackboard){
 		size_t i;
 		for(i = 0;i + 1 < polySize(arg);i++){
 			if(polyType(array[i]) != ARRAY && polyType(array[i + 1]) != ARRAY){
-				if(polyType(array[i]) != polyType(array[i + 1])){
-					Poly p1 = polySort(array[i],LEX);
-					Poly p2 = polySort(array[i+1],LEX);
-					if(polyCmp(p1,p2)){
-						polyFree(p1);
-						polyFree(p2);
-						return polyDup(zeroPoly);
-					}
-					polyFree(p1);
-					polyFree(p2);
-				}else{
-					if(polyCmp(array[i],array[i+1])){
-						polyFree(arg);
-						return polyDup(zeroPoly);
-					}
+				if(polyCmp(array[i],array[i+1])){
+					polyFree(arg);
+					return polyDup(zeroPoly);
 				}
 			}else if(polyType(array[i]) == ARRAY && polyType(array[i + 1]) == ARRAY){
 				if(polySize(array[i]) != polySize(array[i + 1])){
-						return polyDup(zeroPoly);
+					return polyDup(zeroPoly);
 				}
 				size_t j;
 				for(j = 0;j < polySize(array[i]);j++){
@@ -358,20 +326,28 @@ Poly builtIn_EQ(Poly arg,BlackBoard blackboard){
 			}
 		}
 	}
-	return K2Poly(K_1,LEX);
+	return K2Poly(K_1);
 }
 
-Poly builtIn_RSHIFT(Poly arg,BlackBoard blackboard){
+Poly builtIn_LSHIFT(Poly arg,BlackBoard blackboard){
 	if(polyType(arg) != ARRAY){
 		size_t i;
 		for(i = 0;i < polySize(arg);i++){
 			Term term = arg.ptr.terms[i];
+			if(termSize(term) == 0){
+				//constant. ignoring.
+				continue;
+			}
 			size_t newSize = termSize(term) - 1;
 			Term newTerm;
 			setTermSize(newTerm,newSize);
 			copyK(newTerm.coefficient,term.coefficient);
 			termDegreeAllocator(newTerm);
 			size_t j;
+			if(termDegree(term,0)){
+				fprintf(stderr,"A variable x_0 disappeared in \\LSHIFT, you probably don't want it.\n");
+				DIE;
+			}
 			for(j = 1;j < termSize(term);j++){
 				N val = termDegree(term,j);
 				if(val){
@@ -381,7 +357,7 @@ Poly builtIn_RSHIFT(Poly arg,BlackBoard blackboard){
 			termFree(term);
 			arg.ptr.terms[i] = newTerm;
 		}
-		Poly retval = polySort(arg,polyType(arg));
+		Poly retval = polySort(arg);
 		polyFree(arg);
 		return retval;
 	}else{
@@ -389,7 +365,7 @@ Poly builtIn_RSHIFT(Poly arg,BlackBoard blackboard){
 		size_t i;
 		size_t index = 0;
 		for(i = 0;i < polySize(arg);i++){
-			if(isNullPoly(array[index] = builtIn_RSHIFT(array[i],blackboard))
+			if(isNullPoly(array[index] = builtIn_LSHIFT(polyDup(array[i]),blackboard))
 				|| isZeroPoly(array[index])){
 				polyFree(array[index]);
 			}else{
@@ -397,21 +373,26 @@ Poly builtIn_RSHIFT(Poly arg,BlackBoard blackboard){
 			}
 		}
 		setPolySize(arg,index);
+		polyFree(arg);
 		return arg;
 	}
 }
-Poly builtIn_LSHIFT(Poly arg,BlackBoard blackboard){
-	if(polyType(arg) != ARRAY){
+Poly builtIn_RSHIFT(Poly arg,BlackBoard blackboard){
+	if(polyType(arg) == POLY){
 		size_t i;
 		for(i = 0;i < polySize(arg);i++){
 			Term term = arg.ptr.terms[i];
+			if(termSize(term) == 0){
+				//constant. ignoring.
+				continue;
+			}
 			size_t newSize = termSize(term) + 1;
 			Term newTerm;
 			setTermSize(newTerm,newSize);
 			copyK(newTerm.coefficient,term.coefficient);
 			termDegreeAllocator(newTerm);
 			size_t j;
-			for(j = 0;j + 1 < termSize(term);j++){
+			for(j = 0;j < termSize(term);j++){
 				N val = termDegree(term,j);
 				if(val){
 					setTermDegree(newTerm,j + 1,val);
@@ -420,7 +401,7 @@ Poly builtIn_LSHIFT(Poly arg,BlackBoard blackboard){
 			termFree(term);
 			arg.ptr.terms[i] = newTerm;
 		}
-		Poly retval = polySort(arg,polyType(arg));
+		Poly retval = polySort(arg);
 		polyFree(arg);
 		return retval;
 	}else{
@@ -428,7 +409,7 @@ Poly builtIn_LSHIFT(Poly arg,BlackBoard blackboard){
 		size_t i;
 		size_t index = 0;
 		for(i = 0;i < polySize(arg);i++){
-			if(isNullPoly(array[index] = builtIn_RSHIFT(array[i],blackboard))
+			if(isNullPoly(array[index] = builtIn_RSHIFT(polyDup(array[i]),blackboard))
 				|| isZeroPoly(array[index])){
 				polyFree(array[index]);
 			}else{
@@ -436,6 +417,7 @@ Poly builtIn_LSHIFT(Poly arg,BlackBoard blackboard){
 			}
 		}
 		setPolySize(arg,index);
+		polyFree(arg);
 		return arg;
 	}
 }
@@ -526,11 +508,6 @@ const Function BUILT_IN_FUNCS[] = {
 		.name = "SP",
 		.description = "Calculate S polynomial",
 		.funcptr = builtIn_SP
-	},
-	{
-		.name = "SRT",
-		.description = "Sort polynomial by specified monomial order",
-		.funcptr = builtIn_SRT
 	},
 	{
 		.name = "SSN",

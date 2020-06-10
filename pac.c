@@ -195,7 +195,6 @@ Poly PAC(Poly arg,BlackBoard blackboard){
 	size_t *indexes = calloc(sizeof(size_t) , outputSize);
 	size_t remaining = outputSize;
 	size_t termsIndex = 0;
-	MonomialOrder order = polyType(array[0]);
 	while(remaining > 0){
 		Term biggestTerm;
 		int first = 1;
@@ -206,7 +205,7 @@ Poly PAC(Poly arg,BlackBoard blackboard){
 			if(first){
 				biggestTerm = array[i].ptr.terms[indexes[i]];
 				first = 0;
-			}else if(cmpTerm(order,biggestTerm,array[i].ptr.terms[indexes[i]]) < 0){
+			}else if(cmpTerm(biggestTerm,array[i].ptr.terms[indexes[i]]) < 0){
 				biggestTerm = array[i].ptr.terms[indexes[i]];
 			}
 		}
@@ -214,7 +213,7 @@ Poly PAC(Poly arg,BlackBoard blackboard){
 			if(indexes[i] >= polySize(array[i])){
 				continue;
 			}
-			if(cmpTerm(order,biggestTerm,array[i].ptr.terms[indexes[i]]) == 0){
+			if(cmpTerm(biggestTerm,array[i].ptr.terms[indexes[i]]) == 0){
 				if((++indexes[i]) >= polySize(array[i])){
 					remaining--;
 				}

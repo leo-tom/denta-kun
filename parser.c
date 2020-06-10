@@ -37,8 +37,7 @@ enum NodeType {
 	Command,
 	Variable,
 	Number,
-	Block,
-	Say
+	Block
 };
 
 #define NODE_STR_SIZE (128)
@@ -234,15 +233,17 @@ void _print_parsed_tex(Node *n,FILE *fp){
 				fprintf(fp,"}");
 			}
 			break;
-			case Say : {
-				fprintf(fp," \"%s\" ",now->str);
-			}
-			break;
 		}
 		now = now->next;
 	}
 }
 #endif
+
+Node * unwrapBlock(Node *node){
+	Node *ptr;
+	memcpy(&ptr,node->str,sizeof(Node *));
+	return ptr;
+}
 
 Node * variableName(Node *node,char *str){
 	enum NodeType lastType = Number;
@@ -479,7 +480,7 @@ Poly _parser(Node *head,Node *tail,BlackBoard *blackboard){
 		}
 		now = now->next;
 	}
-	Poly retval = K2Poly(K_1,LEX);
+	Poly retval = K2Poly(K_1);
 	
 	now = head;
 	while(now != tail && now){
@@ -496,7 +497,7 @@ Poly _parser(Node *head,Node *tail,BlackBoard *blackboard){
 					if(now == NULL){
 						p = callBuiltInFunc(str,nullPoly,*blackboard);
 					}else{
-						p = callBuiltInFunc(str,_parser(*((Node **)&now->str),NULL,blackboard),*blackboard);
+						p = callBuiltInFunc(str,_parser(unwrapBlock(now),NULL,blackboard),*blackboard);
 						now = now->next;
 					}
 				}
@@ -513,7 +514,7 @@ Poly _parser(Node *head,Node *tail,BlackBoard *blackboard){
 				break;
 			}
 			case Block:{
-				Poly p = _parser(*((Node **)&now->str),NULL,blackboard);
+				Poly p = _parser(unwrapBlock(now),NULL,blackboard);
 				if(now->next == NULL && head == now){
 					polyFree(retval);
 					return p;
@@ -546,8 +547,8 @@ Poly _parser(Node *head,Node *tail,BlackBoard *blackboard){
 				if(!strcmp(now->str,"x")){
 					now = now->next;
 					int counter = 0;
-					N index = 0;
-					N degrees = 1;
+					int64_t index = SUBSHIFT;
+					int64_t degrees = 1;
 					for(counter = 0;counter < 2;counter++){
 						if(now == NULL){
 							break;
@@ -559,28 +560,35 @@ Poly _parser(Node *head,Node *tail,BlackBoard *blackboard){
 								subscriptDesuka = 0;
 							}
 							now = now->next;
-							uint64_t n;
+							int64_t n = 1;
+							Node *node;
 							switch(now->type){
 								case Block:{
-									Node *inside_block = *((Node **)&now->str);
-									if(inside_block->type == Number && inside_block->next == NULL){
-										n = atoll(inside_block->str);
-										break;
-									}else{
-										fprintf(stderr,"Subscript must be just a number.\n");
-										DIE;
-									}
-								}break;
-								case Number:{
-									n = (N) atoll(now->str);
-								}break;
+									node = unwrapBlock(now);
+								}
+								break;
 								default : {
-									fprintf(stderr,"After \'%s\', a number must follow",now->str);
-									DIE;
-								}break;
+									node = now;
+								}
+								break;
+							}
+							if(node->type == Command && !strcmp(node->str,"+")){
+								node = node->next;
+								if(node->type == Number && !strcmp(node->str,"-1")){
+									n = -1;
+									node = node->next;
+								}else{
+									n = 1;
+								}
+							}
+							if(node->type == Number){
+								n *= atoll(node->str);
+							}else{
+								fprintf(stderr,"Subscript must be a number.\n");
+								DIE;
 							}
 							if(subscriptDesuka){
-								index = n;
+								index += n;
 							}else{
 								degrees = n;
 							}
@@ -601,6 +609,7 @@ Poly _parser(Node *head,Node *tail,BlackBoard *blackboard){
 					copyK(term.coefficient,K_1);
 					Poly mulDis = term2Poly(term);
 					Poly tmp = polyMul(retval,mulDis);
+					//polyPrint(tmp,K2str,stderr);
 					polyFree(retval);
 					polyFree(mulDis);
 					retval = tmp;
@@ -616,19 +625,9 @@ Poly _parser(Node *head,Node *tail,BlackBoard *blackboard){
 						polyFree(retval);
 						return mulDis;
 					}
-					if(polyType(mulDis) != polyType(retval)){
-						Poly tmp = polySort(mulDis,polyType(retval));
-						polyFree(mulDis);
-						mulDis = tmp;
-					}
 					Poly tmp = polyMul(retval,mulDis); polyFree(retval); polyFree(mulDis);
 					retval = tmp;
 				}
-				break;
-			}
-			case Say:{
-				fprintf(OUTFILE,"%s",now->str);
-				now = now->next;
 				break;
 			}
 			default :{
@@ -643,7 +642,7 @@ void freeNodes(Node *node){
 	while(node){
 		Node *next = node->next;
 		if(node->type == Block){
-			freeNodes(*((Node **)&node->str));
+			freeNodes(unwrapBlock(node));
 		}
 		free(node);
 		node = next;
@@ -662,12 +661,11 @@ Poly parser(FILE *stream,BlackBoard *blackboard){
 			fprintf(stderr,"Input : ");
 			_print_parsed_tex(nodes,stderr);
 			fprintf(stderr,"\n");
-			
-			fprintf(stderr,"Parsed as : ");
 		#endif
 		Poly retval = _parser(nodes,NULL,blackboard);
 		freeNodes(nodes);
 		#if DEBUG >= 2
+			fprintf(stderr,"Parsed as : ");
 			polyPrint(retval,K2str,stderr);
 			fprintf(stderr,"\n");
 		#endif

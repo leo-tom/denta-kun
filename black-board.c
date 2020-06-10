@@ -46,9 +46,15 @@ void printBlackBoard(BlackBoard blackboard,FILE *fp){
 	}
 }
 
+char * unwrapLongString(const Definition *def){
+	char *ptr;
+	memcpy(&ptr,&def->bytes[1],sizeof(char *));
+	return ptr;
+}
+
 const char * getNameFromDefinition(unmut const Definition *def){
 	if(def->bytes[0] & 0x80){
-		return (const char *) (*((char **) (&def->bytes[1])));
+		return (const char *) unwrapLongString(def);
 	}else{
 		return (const char *)def->bytes;
 	}
@@ -56,7 +62,7 @@ const char * getNameFromDefinition(unmut const Definition *def){
 
 void freeDefinition(mut Definition def){
 	if(def.bytes[0] & 0x80){
-		free(*((char **) &(def.bytes[1])));
+		free(unwrapLongString(&def));
 	}
 	polyFree(def.poly);
 }

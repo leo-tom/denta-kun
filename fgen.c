@@ -42,7 +42,7 @@ Poly _cfunc2poly(uint64_t (*funcptr)(uint64_t),size_t inputSize,size_t outputSiz
 		uint64_t val = funcptr(x);
 		for(i = 0;i < outputSize;i++){
 			if(val & (1 << i)){
-				Poly tmp = K2Poly(K_1,LEX);
+				Poly tmp = K2Poly(K_1);
 				for(j = 0; j < inputSize;j++){
 					char buff[32];
 					if(x & (1 << j)){
