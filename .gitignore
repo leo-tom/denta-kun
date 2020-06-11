@@ -1,5 +1,5 @@
 *.o
 *.bo
-bentakun
-dentakun
+/bentakun
+/dentakun
 

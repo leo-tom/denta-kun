@@ -169,7 +169,7 @@ void _setPolyType(Poly *poly,PolyType);
 
 #if BOOLEAN
 #define termSize(term) (term.sizu)
-#define termFree(term) do{ if(term.sizu <= sizeof(N)*8){term.deg.val = 0;}else{free(term.deg.ptr);}}while(0)
+#define termFree(term) do{ if(term.sizu < sizeof(N)*8){term.deg.val = 0;}else{free(term.deg.ptr);}}while(0)
 #define termDegree(term,index) ((term.sizu < sizeof(N)*8) \
 									? ((term.deg.val >> (index)) & 0x1) \
 									: (N)((term.deg.ptr[(index)/(sizeof(N)*8)] >> ((index) % (sizeof(N)*8))) & 0x1))
@@ -246,8 +246,10 @@ Poly instantParser(char *code,BlackBoard *blackboard);
 
 /*following functions takes Poly expected to be already sorted by same monomial order*/
 Poly polyAdd(unmut Poly v1,unmut Poly v2);
+Poly _polyAdd(mut Poly v1,mut Poly v2);
 Poly polySub(unmut Poly v1,unmut Poly v2);
 Poly polyMul(unmut Poly v1,unmut Poly v2);
+Poly _polyMul(mut Poly v1,mut Poly v2);
 /*This function returns array of Poly whose length is (size + 1).*/
 /*divisor must be array of Poly whose length is 'size'*/
 Poly polyDiv(unmut Poly dividend,unmut Poly divisor);

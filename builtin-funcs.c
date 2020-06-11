@@ -161,7 +161,7 @@ Poly builtIn_SUB(Poly arg,BlackBoard blackboard){
 	Poly poly = array[0];
 	size_t size;
 	BlackBoard map = mkBlackBoard();
-	int64_t i,j,k;
+	int64_t i,j;
 	for(i = 1;i < polySize(arg);i++){
 		Poly tuple = array[i];
 		if(polyType(tuple) != ARRAY || polySize(tuple) != 2){
@@ -199,18 +199,20 @@ Poly builtIn_SUB(Poly arg,BlackBoard blackboard){
 					fprintf(stderr,"I don't know what to do with x_{%ld}.\n",j);
 					goto err;
 				}
+				#if BOOLEAN
+				tmp = _polyMul(tmp,value);
+				#else
+				int64_t k;
 				for(k = 0;k < termDegree(term,j);k++){
 					Poly temp = polyMul(tmp,value);
 					polyFree(tmp);
 					tmp = temp;
 				}
 				polyFree(value);
+				#endif
 			}
 		}
-		Poly temp = polyAdd(val,tmp);
-		polyFree(val);
-		polyFree(tmp);
-		val = temp;
+		val = _polyAdd(val,tmp);
 	}
 	polyFree(arg);
 	freeBlackBoard(map);

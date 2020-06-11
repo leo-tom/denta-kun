@@ -251,18 +251,22 @@ int polyCmp(unmut Poly v1,unmut Poly v2){
 	}
 	return 0;
 }
-Poly polyAdd(unmut Poly v1,unmut Poly v2){
+Poly _polyAdd(mut Poly v1,mut Poly v2){
 	if(polyType(v1) == ARRAY || polyType(v2) == ARRAY){
 		fprintf(stderr,"You cant add arrays\n");
 		DIE;
 	}
 	if(isNullPoly(v1) || isNullPoly(v2)){
+		polyFree(v1);
+		polyFree(v2);
 		return nullPoly;
 	}
 	if(isZeroPoly(v1)){
-		return polyDup(v2);
+		polyFree(v1);
+		return v2;
 	}else if(isZeroPoly(v2)){
-		return polyDup(v1);
+		polyFree(v2);
+		return v1;
 	}
 
 	int i,j,index;
@@ -283,22 +287,34 @@ Poly polyAdd(unmut Poly v1,unmut Poly v2){
 			cmpVal = cmpTerm(v1.ptr.terms[i],v2.ptr.terms[j]);
 		}
 		if(cmpVal > 0){
-			retval.ptr.terms[index++] = dupTerm(v1.ptr.terms[i++]);
+			retval.ptr.terms[index++] = v1.ptr.terms[i++];
 		}else if(cmpVal < 0){
-			retval.ptr.terms[index++] = dupTerm(v2.ptr.terms[j++]);
+			retval.ptr.terms[index++] = v2.ptr.terms[j++];
 		}else{
-			retval.ptr.terms[index] = dupTerm(v1.ptr.terms[i++]);
+			#if BOOLEAN
+				termFree(v1.ptr.terms[i]);
+				termFree(v2.ptr.terms[j]);
+				i++;j++;
+				someThingDisappeared = 1;
+			#else
+			
+			retval.ptr.terms[index] = v1.ptr.terms[i++];
 			addK(retval.ptr.terms[index].coefficient
 					,retval.ptr.terms[index].coefficient
-					,v2.ptr.terms[j++].coefficient);
+					,v2.ptr.terms[j].coefficient);
+			termFree(v2.ptr.terms[j]);
+			j++;
 			if(!cmpK(retval.ptr.terms[index].coefficient,K_0)){
 				someThingDisappeared = 1;
 				termFree(retval.ptr.terms[index]);
 			}else{
 				index++;
 			}
+			#endif
 		}
 	}
+	free(v1.ptr.terms);
+	free(v2.ptr.terms);
 	if(index == 0 && someThingDisappeared){
 		free(retval.ptr.terms);
 		retval = polyDup(zeroPoly);
@@ -308,6 +324,11 @@ Poly polyAdd(unmut Poly v1,unmut Poly v2){
 	}
 	return retval;
 }
+
+Poly polyAdd(unmut Poly v1,unmut Poly v2){
+	return _polyAdd(polyDup(v1),polyDup(v2));
+}
+
 Poly polySub(unmut Poly v1,unmut Poly v2){
 	#if !BOOLEAN
 	size_t i;
@@ -323,21 +344,28 @@ Poly polySub(unmut Poly v1,unmut Poly v2){
 	#endif
 	return retval;
 }
-Poly polyMul(unmut Poly v1,unmut Poly v2){
+
+Poly _polyMul(mut Poly v1,mut Poly v2){
 	if(polyType(v1) == ARRAY || polyType(v2) == ARRAY){
 		fprintf(stderr,"You can't multiply arrays\n");
 		DIE;
 	}
 	if(isNullPoly(v1) || isNullPoly(v2)){
+		polyFree(v1);
+		polyFree(v2);
 		return nullPoly;
 	}
 	if(isZeroPoly(v1) || isZeroPoly(v2)){
+		polyFree(v1);
+		polyFree(v2);
 		return polyDup(zeroPoly);
 	}
 	if(!polyCmp(v1,onePoly)){
-		return polyDup(v2);
+		polyFree(v1);
+		return v2;
 	}else if(!polyCmp(v2,onePoly)){
-		return polyDup(v1);
+		polyFree(v2);
+		return v1;
 	}
 	
 	int64_t i,j,k,index;
@@ -376,13 +404,28 @@ Poly polyMul(unmut Poly v1,unmut Poly v2){
 			#endif
 			index++;			
 		}
+		if(i%2 == 0 && index > 2 * i){
+			setPolySize(retval,index);
+			setPolyType(retval,POLY);
+			Poly tmp = polySort(retval);
+			polyFree(retval);
+			retval = tmp;
+			retval.ptr.polies = realloc(retval.ptr.polies,sizeof(Term)*polySize(v1)*polySize(v2));
+			index = polySize(retval);
+		}
 	}
+	polyFree(v1);
+	polyFree(v2);
 	setPolySize(retval,index);
 	setPolyType(retval,POLY);
 	Poly tmp = retval;
 	retval = polySort(tmp);
 	polyFree(tmp);
 	return retval;
+}
+
+Poly polyMul(unmut Poly v1,unmut Poly v2){
+	return _polyMul(polyDup(v1),polyDup(v2));
 }
 
 int _isDiviable(unmut Term dividend,unmut Term divisor){
@@ -469,15 +512,8 @@ Poly polyDiv(unmut Poly dividend,unmut Poly divisors){
 			divK(w.coefficient,u.coefficient , g.coefficient);
 			mulK(w.coefficient,w.coefficient , K_N1);
 			Poly tmp = term2Poly(w);
-			Poly temp = polyMul(tmp,divisor[j]);
-			Poly tempo = polyAdd(h,temp);
-			polyFree(h);
-			polyFree(temp);
-			h = tempo;
-			Poly newVal = polyAdd(retval[j],tmp);
-			polyFree(tmp);
-			polyFree(retval[j]);
-			retval[j] = newVal;
+			h = _polyAdd(h,polyMul(tmp,divisor[j]));
+			retval[j] = _polyAdd(retval[j],tmp);
 		}
 	}
 	retval[size] = h;
