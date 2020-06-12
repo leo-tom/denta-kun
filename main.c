@@ -59,7 +59,7 @@ BlackBoard readPreInclude(BlackBoard blackboard){
 	close(wfd);
 	FILE *fp = fdopen(rfd,"r");
 	while(!feof(fp)){
-		parser(fp,&blackboard);
+		polyFree(parser(fp,&blackboard));
 	}
 	return blackboard;
 }
@@ -167,7 +167,6 @@ int main(int argc,char *argv[]){
 	uint64_t cmdNumber = 0;
 	while(!feof(infile)){
 		Poly poly;
-		size_t blackboardSize = blackboard.size;
 		#if DEBUG == 0
 			poly = parser(infile,&blackboard);
 			cmdNumber++;
@@ -177,11 +176,9 @@ int main(int argc,char *argv[]){
 			polyPrint(poly,K2str,stderr);
 			fprintf(stderr," => %lu\n",polySizeInByte(poly));
 		#endif
-		if(blackboardSize == blackboard.size){
-			//parser did not define anything.
-			polyFree(poly);
-		}
+		polyFree(poly);
 	}
+	freeBlackBoard(blackboard);
 	return 0;
 }
 

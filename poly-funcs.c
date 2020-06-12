@@ -252,6 +252,7 @@ int polyCmp(unmut Poly v1,unmut Poly v2){
 	return 0;
 }
 Poly _polyAdd(mut Poly v1,mut Poly v2){
+	#if DEBUG
 	if(polyType(v1) == ARRAY || polyType(v2) == ARRAY){
 		fprintf(stderr,"You cant add arrays\n");
 		DIE;
@@ -261,6 +262,7 @@ Poly _polyAdd(mut Poly v1,mut Poly v2){
 		polyFree(v2);
 		return nullPoly;
 	}
+	#endif
 	if(isZeroPoly(v1)){
 		polyFree(v1);
 		return v2;
@@ -346,6 +348,7 @@ Poly polySub(unmut Poly v1,unmut Poly v2){
 }
 
 Poly _polyMul(mut Poly v1,mut Poly v2){
+	#if DEBUG
 	if(polyType(v1) == ARRAY || polyType(v2) == ARRAY){
 		fprintf(stderr,"You can't multiply arrays\n");
 		DIE;
@@ -355,6 +358,7 @@ Poly _polyMul(mut Poly v1,mut Poly v2){
 		polyFree(v2);
 		return nullPoly;
 	}
+	#endif
 	if(isZeroPoly(v1) || isZeroPoly(v2)){
 		polyFree(v1);
 		polyFree(v2);
@@ -404,13 +408,11 @@ Poly _polyMul(mut Poly v1,mut Poly v2){
 			#endif
 			index++;			
 		}
-		if(i%2 == 0 && index > 2 * i){
+		if(i%5 == 0 ){
 			setPolySize(retval,index);
 			setPolyType(retval,POLY);
-			Poly tmp = polySort(retval);
-			polyFree(retval);
-			retval = tmp;
-			retval.ptr.polies = realloc(retval.ptr.polies,sizeof(Term)*polySize(v1)*polySize(v2));
+			retval = _polySort(retval);
+			retval.ptr.terms = realloc(retval.ptr.terms,sizeof(Term)*polySize(v1)*polySize(v2));
 			index = polySize(retval);
 		}
 	}
@@ -418,10 +420,7 @@ Poly _polyMul(mut Poly v1,mut Poly v2){
 	polyFree(v2);
 	setPolySize(retval,index);
 	setPolyType(retval,POLY);
-	Poly tmp = retval;
-	retval = polySort(tmp);
-	polyFree(tmp);
-	return retval;
+	return _polySort(retval);
 }
 
 Poly polyMul(unmut Poly v1,unmut Poly v2){
@@ -734,52 +733,50 @@ void polyNice(unmut Poly p){
 	#endif
 }
 
-Poly polySort(unmut Poly poly){
+Poly _polySort(mut Poly poly){
 	if(polyType(poly) == ARRAY){
 		size_t size = polySize(poly);
 		size_t i;
-		Poly *source = unwrapPolyArray(poly);
- 		Poly *ptr = malloc(size * sizeof(Poly));
+		Poly *ptr = unwrapPolyArray(poly);
 		for(i = 0;i < size;i++){
-			ptr[i] = polySort(source[i]);
+			ptr[i] = _polySort(ptr[i]);
 		}
-		return mkPolyArray(ptr,size);
+		return poly;
 	}
-	Poly toBeSorted = polyDup(poly);
-	size_t size = polySize(toBeSorted);
-	qsort(toBeSorted.ptr.terms,size,sizeof(Term),(int (*)(const void *,const void *))_cmpTerm_r);
-	Poly retval = {
-		.size = toBeSorted.size, /*Copy entire toBeSorted.size. That is, both type of monomial order and size of terms*/
-		.ptr.terms = malloc(sizeof(Term) * polySize(toBeSorted))
-	};
+	size_t size = polySize(poly);
+	qsort(poly.ptr.terms,size,sizeof(Term),(int (*)(const void *,const void *))_cmpTerm_r);
 	size_t index = 0;
 	int someThingDisappeared = 0;
 	size_t i,j;
 	for(i = 0;i < size;i++){
-		retval.ptr.terms[index] = toBeSorted.ptr.terms[i];
-		for(j = i + 1;j < size && !cmpTerm(toBeSorted.ptr.terms[i],toBeSorted.ptr.terms[j]);j++){
-			addK(retval.ptr.terms[index].coefficient,
-				retval.ptr.terms[index].coefficient, toBeSorted.ptr.terms[j].coefficient);
-			termFree(toBeSorted.ptr.terms[j]);
+		poly.ptr.terms[index] = poly.ptr.terms[i];
+		for(j = i + 1;j < size && !cmpTerm(poly.ptr.terms[index],poly.ptr.terms[j]);j++){
+			addK(poly.ptr.terms[index].coefficient,
+				poly.ptr.terms[index].coefficient, poly.ptr.terms[j].coefficient);
+			termFree(poly.ptr.terms[j]);
 		}
-		if(!cmpK(retval.ptr.terms[index].coefficient , K_0)){
-			termFree(retval.ptr.terms[index]);
+		if(!cmpK(poly.ptr.terms[index].coefficient , K_0)){
+			termFree(poly.ptr.terms[index]);
 			someThingDisappeared = 1;
 		}else{
 			index++;
 		}
 		i = j - 1;
 	}
-	free(toBeSorted.ptr.terms);
 	if(index == 0 && someThingDisappeared){
-		free(retval.ptr.terms);
-		retval = polyDup(zeroPoly);
-	}else if(polySize(retval) != index){
-		retval.ptr.terms = realloc(retval.ptr.terms,sizeof(Term)*index);
-		setPolySize(retval,index);
+		free(poly.ptr.terms);
+		poly = polyDup(zeroPoly);
+	}else if(polySize(poly) != index){
+		poly.ptr.terms = realloc(poly.ptr.terms,sizeof(Term)*index);
+		setPolySize(poly,index);
 	}
-	return retval;
+	return poly;
 }
+
+Poly polySort(unmut Poly poly){
+	return _polySort(polyDup(poly));
+}
+
 Poly mkPolyArray(mut Poly *array,size_t size){
 	Poly retval;
 	retval.size = 0;

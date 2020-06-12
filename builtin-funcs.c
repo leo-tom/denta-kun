@@ -359,9 +359,7 @@ Poly builtIn_LSHIFT(Poly arg,BlackBoard blackboard){
 			termFree(term);
 			arg.ptr.terms[i] = newTerm;
 		}
-		Poly retval = polySort(arg);
-		polyFree(arg);
-		return retval;
+		return _polySort(arg);
 	}else{
 		Poly *array = unwrapPolyArray(arg);
 		size_t i;
@@ -403,9 +401,7 @@ Poly builtIn_RSHIFT(Poly arg,BlackBoard blackboard){
 			termFree(term);
 			arg.ptr.terms[i] = newTerm;
 		}
-		Poly retval = polySort(arg);
-		polyFree(arg);
-		return retval;
+		return _polySort(arg);
 	}else{
 		Poly *array = unwrapPolyArray(arg);
 		size_t i;

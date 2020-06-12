@@ -405,6 +405,7 @@ Poly _parser(Node *head,Node *tail,BlackBoard *blackboard){
 		if(isNullPoly(ptr[s-1])){
 			fprintf(stderr,"NO!");
 			s--;
+			DIE;
 		}
 		return mkPolyArray(ptr,s);
 	}else{
@@ -473,7 +474,7 @@ Poly _parser(Node *head,Node *tail,BlackBoard *blackboard){
 		}
 		now = now->next;
 	}
-	Poly retval = K2Poly(K_1);
+	Poly retval = polyDup(onePoly);
 	
 	now = head;
 	while(now != tail && now){
@@ -498,6 +499,7 @@ Poly _parser(Node *head,Node *tail,BlackBoard *blackboard){
 					polyFree(retval);
 					return p;
 				}else if(isNullPoly(p)){
+					polyFree(retval);
 					return p;
 				}
 				retval = _polyMul(retval,p);

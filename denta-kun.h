@@ -270,6 +270,7 @@ Term dupTerm(unmut Term);
 Poly polyIn(unmut Poly poly);
 Poly term2Poly(mut Term);
 Poly polySort(unmut Poly poly);
+Poly _polySort(mut Poly poly);
 void polyPrint(unmut Poly poly,char*(*printer)(K ),FILE *fp);
 //Poly appendTerm2Poly(mut Poly poly,mut Term);
 double poly2Double(unmut Poly poly);
