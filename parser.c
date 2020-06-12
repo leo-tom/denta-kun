@@ -442,13 +442,11 @@ Poly _parser(Node *head,Node *tail,BlackBoard *blackboard){
 								}
 							}
 						}else{
-							retval = polyAdd(pLeft,pRight);
+							return _polyAdd(pLeft,pRight);
 						}
 					}else{
 						return pRight;
 					}
-					polyFree(pLeft);
-					polyFree(pRight);
 					return retval;
 				}
 				break;
@@ -465,12 +463,7 @@ Poly _parser(Node *head,Node *tail,BlackBoard *blackboard){
 		switch(now->type){
 			case Command:{
 				if(!strcmp(now->str,"times") || !strcmp(now->str,"cdot")){
-					Poly pLeft = _parser(head,now,blackboard);
-					Poly pRight = _parser(now->next,tail,blackboard);
-					Poly retval = polyMul(pLeft,pRight);
-					polyFree(pLeft);
-					polyFree(pRight);
-					return retval;
+					return _polyMul(_parser(head,now,blackboard),_parser(now->next,tail,blackboard));
 				}
 				break;
 			}
@@ -507,10 +500,7 @@ Poly _parser(Node *head,Node *tail,BlackBoard *blackboard){
 				}else if(isNullPoly(p)){
 					return p;
 				}
-				Poly tmp = polyMul(retval,p);
-				polyFree(p);
-				polyFree(retval);
-				retval = tmp;
+				retval = _polyMul(retval,p);
 				break;
 			}
 			case Block:{
@@ -522,10 +512,7 @@ Poly _parser(Node *head,Node *tail,BlackBoard *blackboard){
 					polyFree(retval);
 					return p;
 				}
-				Poly tmp = polyMul(retval,p);
-				polyFree(p);
-				polyFree(retval);
-				retval = tmp;
+				retval = _polyMul(retval,p);
 				now = now->next;
 				break;
 			}
@@ -608,11 +595,8 @@ Poly _parser(Node *head,Node *tail,BlackBoard *blackboard){
 					setTermDegree(term,index,degrees);
 					copyK(term.coefficient,K_1);
 					Poly mulDis = term2Poly(term);
-					Poly tmp = polyMul(retval,mulDis);
+					retval = _polyMul(retval,mulDis);
 					//polyPrint(tmp,K2str,stderr);
-					polyFree(retval);
-					polyFree(mulDis);
-					retval = tmp;
 				}else{
 					char buff[256];
 					now = variableName(now,buff);
@@ -625,8 +609,7 @@ Poly _parser(Node *head,Node *tail,BlackBoard *blackboard){
 						polyFree(retval);
 						return mulDis;
 					}
-					Poly tmp = polyMul(retval,mulDis); polyFree(retval); polyFree(mulDis);
-					retval = tmp;
+					retval = _polyMul(retval,mulDis); 
 				}
 				break;
 			}

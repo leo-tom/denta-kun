@@ -119,7 +119,7 @@ int main(int argc,char *argv[]){
 			}break;
 			case 's':
 			{
-				SUBSHIFT = atoi(optarg);
+				SUBSHIFT = atoll(optarg);
 			}break;
 			case 'l':
 			{

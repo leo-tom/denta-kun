@@ -169,20 +169,20 @@ void _setPolyType(Poly *poly,PolyType);
 
 #if BOOLEAN
 #define termSize(term) (term.sizu)
-#define termFree(term) do{ if(term.sizu < sizeof(N)*8){term.deg.val = 0;}else{free(term.deg.ptr);}}while(0)
-#define termDegree(term,index) ((term.sizu < sizeof(N)*8) \
+#define termFree(term) do{ if(term.sizu <= sizeof(N)*8){term.deg.val = 0;}else{free(term.deg.ptr);}}while(0)
+#define termDegree(term,index) ((term.sizu <= sizeof(N)*8) \
 									? ((term.deg.val >> (index)) & 0x1) \
 									: (N)((term.deg.ptr[(index)/(sizeof(N)*8)] >> ((index) % (sizeof(N)*8))) & 0x1))
-#define termDegreeAllocator(term) ((term.sizu < sizeof(N)*8) ? (term.deg.val = 0,NULL) \
+#define termDegreeAllocator(term) ((term.sizu <= sizeof(N)*8) ? (term.deg.val = 0,NULL) \
 									: (term.deg.ptr = calloc(sizeof(N),term.sizu/(sizeof(N)*8) + 1)))
 #define setTermDegree(term,index,value) (value ? \
-											((term.sizu < sizeof(N)*8) \
+											((term.sizu <= sizeof(N)*8) \
 												? (term.deg.val |= ((N)1 << (index))) \
-												: (term.deg.ptr[(index)/(sizeof(N)*8)] |= (1 << ((index) % (sizeof(N)*8)))) \
+												: (term.deg.ptr[(index)/(sizeof(N)*8)] |= ((N)1 << ((index) % (sizeof(N)*8)))) \
 											)\
-											:((term.sizu < sizeof(N)*8) \
-												? (term.deg.val &= ~(1 << (index))) \
-												: ((term.deg.ptr[(index)/(sizeof(N)*8)] &= (~(1 << ((index) % (sizeof(N)*8)))))) \
+											:((term.sizu <= sizeof(N)*8) \
+												? (term.deg.val &= ~((N)1 << (index))) \
+												: ((term.deg.ptr[(index)/(sizeof(N)*8)] &= (~((N)1 << ((index) % (sizeof(N)*8)))))) \
 											))
 											
 #define setTermSize(term,size) (term.sizu = size)

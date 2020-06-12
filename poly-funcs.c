@@ -617,7 +617,7 @@ Term dupTerm(unmut Term term){
 		if(size <= sizeof(N)*8){
 			retval.deg.val = term.deg.val;
 		}else{
-			memcpy(retval.deg.ptr,term.deg.ptr,sizeof(N)*((size - 1)/(sizeof(N)*8) + 1));
+			memcpy(retval.deg.ptr,term.deg.ptr,sizeof(N)*(size/(sizeof(N)*8) + 1));
 		}
 		#else
 		memcpy(retval.deg.ptr,term.deg.ptr,sizeof(N)*size);
