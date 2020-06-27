@@ -74,8 +74,9 @@ void polyFree(mut Poly v){
 			polyFree(*ptr++);
 		}
 	}else{
+		Term *ptr = v.ptr.terms;
 		for(i=0;i < size;i++){
-			termFree(v.ptr.terms[i]);
+			termFree(*ptr++);
 		}
 	}
 	if(size > 0){
@@ -101,9 +102,11 @@ N polyDegrees(unmut Poly p){
 	return max;
 }
 Poly polyDup(unmut Poly poly){
+	#if DEBUG
 	if(polySize(poly) == 0){
 		return nullPoly;
 	}
+	#endif
 	Poly retval = {
 		.size = poly.size
 	};
@@ -206,6 +209,7 @@ void polyPrint(unmut Poly poly,char*(*printer)(K),FILE *fp){
 			}
 		}
 	}
+	fflush(fp);
 }
 Poly term2Poly(mut Term term){
 	Poly retval = {.size = 0};
@@ -299,7 +303,6 @@ Poly _polyAdd(mut Poly v1,mut Poly v2){
 				i++;j++;
 				someThingDisappeared = 1;
 			#else
-			
 			retval.ptr.terms[index] = v1.ptr.terms[i++];
 			addK(retval.ptr.terms[index].coefficient
 					,retval.ptr.terms[index].coefficient
@@ -358,6 +361,13 @@ Poly _polyMul(mut Poly v1,mut Poly v2){
 		polyFree(v2);
 		return nullPoly;
 	}
+	if(polySize(v1) == 0 || polySize(v2) == 0){
+		fprintf(stderr,"This should not be happening\n");
+		polyPrint(v1,K2str,stderr);
+		polyPrint(v2,K2str,stderr);
+		v1.ptr.terms[0] = v2.ptr.terms[1];
+		DIE;
+	}
 	#endif
 	if(isZeroPoly(v1) || isZeroPoly(v2)){
 		polyFree(v1);
@@ -372,54 +382,61 @@ Poly _polyMul(mut Poly v1,mut Poly v2){
 		return v1;
 	}
 	
-	int64_t i,j,k,index;
-	if(polySize(v1) == 0 || polySize(v2) == 0){
-		fprintf(stderr,"This should not be happening\n");
-		DIE;
-	}
+	int64_t index;
+	
 	Poly retval = {
 		.size = 0,
 	};
-	retval.ptr.terms = malloc(sizeof(Term)*polySize(v1)*polySize(v2)); 
+	const size_t v1s = polySize(v1);
+	const size_t v2s = polySize(v2);
+	size_t retvalSize = v1s * v2s;
+	retval.ptr.terms = malloc(sizeof(Term)*retvalSize); 
 	index = 0;
-	for(i = 0;i < polySize(v1);i++){
-		for(j = 0;j < polySize(v2);j++){
-			Term bigger,smaller;
-			if(termSize(v1.ptr.terms[i]) > termSize(v2.ptr.terms[j])){
-				bigger = v1.ptr.terms[i];
-				smaller = v2.ptr.terms[j];
+	Term *v1t = v1.ptr.terms;
+	Term *v1tt = v1t + v1s;
+	Term *v2t = v2.ptr.terms;
+	Term *v2tt = v2t + v2s;
+	for(;v1t < v1tt;v1t++){
+		for(v2t = v2.ptr.terms;v2t < v2tt;v2t++){
+			Term *bigger;
+			Term *smaller;
+			if(termSize(*v1t) > termSize(*v2t)){
+				bigger = v1t;
+				smaller = v2t;
 			}else{
-				bigger = v2.ptr.terms[j];
-				smaller = v1.ptr.terms[i];
+				bigger = v2t;
+				smaller = v1t;
 			}
-			retval.ptr.terms[index] = dupTerm(bigger);
-			for(k = 0;k < termSize(smaller) ;k++){
+			retval.ptr.terms[index] = dupTerm(*bigger);
+			const size_t smallerSize = termSize(*smaller);
+			size_t k;
+			for(k = 0;k < smallerSize ;k++){
 				#if BOOLEAN
-					if(termDegree(smaller,k)){
+					if(termDegree(*smaller,k)){
 						setTermDegree(retval.ptr.terms[index],k,1);
 					}
 				#else
-					N deg = termDegree(bigger,k) + termDegree(smaller,k);
+					N deg = termDegree(*bigger,k) + termDegree(*smaller,k);
 					setTermDegree(retval.ptr.terms[index],k,deg);
 				#endif
 			}
 			#if !BOOLEAN
-			mulK(retval.ptr.terms[index].coefficient,retval.ptr.terms[index].coefficient, smaller.coefficient);
+			mulK(retval.ptr.terms[index].coefficient,retval.ptr.terms[index].coefficient, smaller->coefficient);
 			#endif
 			index++;			
 		}
-		if(i%5 == 0 ){
+		if(index > 100 && index > (retvalSize/4)){
 			setPolySize(retval,index);
 			setPolyType(retval,POLY);
-			retval = _polySort(retval);
-			retval.ptr.terms = realloc(retval.ptr.terms,sizeof(Term)*polySize(v1)*polySize(v2));
+			retval = _polyNice(retval);
+			//retval.ptr.terms = realloc(retval.ptr.terms,sizeof(Term)*retvalSize);
 			index = polySize(retval);
 		}
 	}
-	polyFree(v1);
-	polyFree(v2);
 	setPolySize(retval,index);
 	setPolyType(retval,POLY);
+	polyFree(v1);
+	polyFree(v2);
 	return _polySort(retval);
 }
 
@@ -607,11 +624,11 @@ Poly polyS(unmut Poly f,unmut Poly g){
 
 Term dupTerm(unmut Term term){
 	Term retval;
-	size_t size = termSize(term);
+	const size_t size = termSize(term);
 	setTermSize(retval,size);
+	termDegreeAllocator(retval);
 	copyK(retval.coefficient,term.coefficient);
 	if(size){
-		termDegreeAllocator(retval);
 		#if BOOLEAN
 		if(size <= sizeof(N)*8){
 			retval.deg.val = term.deg.val;
@@ -621,8 +638,6 @@ Term dupTerm(unmut Term term){
 		#else
 		memcpy(retval.deg.ptr,term.deg.ptr,sizeof(N)*size);
 		#endif
-	}else{
-		termDegreeAllocator(retval);
 	}
 	return retval; 
 }
@@ -712,8 +727,61 @@ int cmpTerm_r(const Term v1,const Term v2){
 	return -1*cmpTerm(v1,v2);
 }
 
+/*Delete terms which can be disappired*/
+Poly _polyNice(mut Poly p){
+	#if !BOOLEAN
+		DIE;
+	#endif
+	size_t i,j,size;
+	Term zeroTerm = {
+		.deg.ptr = NULL,
+		.sizu = 0
+	};
+	copyK(zeroTerm.coefficient,K_0);
+	size = 0;
+	for(i = 0;i < polySize(p);i++){
+		Term term = p.ptr.terms[i];
+		if(!cmpTerm(term,zeroTerm)){
+			continue;
+		}else{
+			size = i + 1;
+		}
+		int counter = 1;
+		for(j = i + 1;j < polySize(p);j++){
+			if(!cmpTerm(term,p.ptr.terms[j])){
+				termFree(p.ptr.terms[j]);
+				p.ptr.terms[j] = zeroTerm;
+				counter++;
+			}
+		}
+		if(counter % 2 == 0){
+			termFree(p.ptr.terms[i]);
+			for(j = i + 1;j < polySize(p);j++){
+				if(cmpTerm(p.ptr.terms[j],zeroTerm)){
+					p.ptr.terms[i] = p.ptr.terms[j];
+					p.ptr.terms[j] = zeroTerm;
+					i--;
+					break;
+				}
+			}
+			if(j == polySize(p)){
+				// all remaining terms are zero.
+				setPolySize(p,i);
+				return p;
+			}
+		}
+	}
+	if(size == 0){
+		free(p.ptr.terms);
+		return polyDup(zeroPoly);
+	}
+	setPolySize(p,size);
+	//p.ptr.terms = realloc(p.ptr.terms,sizeof(Term)*size);
+	return p;
+}
 
-void polyNice(unmut Poly p){
+void polyNice(mut Poly p){
+	
 	#if BOOLEAN
 	return;
 	#else

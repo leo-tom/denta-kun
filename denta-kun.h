@@ -168,31 +168,31 @@ void _setPolyType(Poly *poly,PolyType);
 #define setPolyType(polynomial,typeToBeSet) _setPolyType(&polynomial,typeToBeSet)
 
 #if BOOLEAN
-#define termSize(term) (term.sizu)
-#define termFree(term) do{ if(term.sizu <= sizeof(N)*8){term.deg.val = 0;}else{free(term.deg.ptr);}}while(0)
-#define termDegree(term,index) ((term.sizu <= sizeof(N)*8) \
-									? ((term.deg.val >> (index)) & 0x1) \
-									: (N)((term.deg.ptr[(index)/(sizeof(N)*8)] >> ((index) % (sizeof(N)*8))) & 0x1))
-#define termDegreeAllocator(term) ((term.sizu <= sizeof(N)*8) ? (term.deg.val = 0,NULL) \
-									: (term.deg.ptr = calloc(sizeof(N),term.sizu/(sizeof(N)*8) + 1)))
+#define termSize(term) ((term).sizu)
+#define termFree(term) do{ if((term).sizu <= sizeof(N)*8){;}else{free((term).deg.ptr);}}while(0)
+#define termDegree(term,index) (((term).sizu <= sizeof(N)*8) \
+									? (((term).deg.val >> (index)) & 0x1) \
+									: (N)(((term).deg.ptr[(index)/(sizeof(N)*8)] >> ((index) % (sizeof(N)*8))) & 0x1))
+#define termDegreeAllocator(term) (((term).sizu <= sizeof(N)*8) ? ((term).deg.val = 0,NULL) \
+									: ((term).deg.ptr = calloc(sizeof(N),(term).sizu/(sizeof(N)*8) + 1)))
 #define setTermDegree(term,index,value) (value ? \
-											((term.sizu <= sizeof(N)*8) \
-												? (term.deg.val |= ((N)1 << (index))) \
-												: (term.deg.ptr[(index)/(sizeof(N)*8)] |= ((N)1 << ((index) % (sizeof(N)*8)))) \
+											(((term).sizu <= sizeof(N)*8) \
+												? ((term).deg.val |= ((N)1 << (index))) \
+												: ((term).deg.ptr[(index)/(sizeof(N)*8)] |= ((N)1 << ((index) % (sizeof(N)*8)))) \
 											)\
-											:((term.sizu <= sizeof(N)*8) \
-												? (term.deg.val &= ~((N)1 << (index))) \
-												: ((term.deg.ptr[(index)/(sizeof(N)*8)] &= (~((N)1 << ((index) % (sizeof(N)*8)))))) \
+											:(((term).sizu <= sizeof(N)*8) \
+												? ((term).deg.val &= ~((N)1 << (index))) \
+												: (((term).deg.ptr[(index)/(sizeof(N)*8)] &= (~((N)1 << ((index) % (sizeof(N)*8)))))) \
 											))
 											
-#define setTermSize(term,size) (term.sizu = size)
+#define setTermSize(term,size) ((term).sizu = size)
 #elif RATIONAL
-#define termSize(term) (term.sizu)
-#define termDegree(term,index) (term.deg.ptr[index])
-#define termDegreeAllocator(term) (term.deg.ptr = calloc(sizeof(N),term.sizu))
-#define termFree(term) do{free(term.deg.ptr);}while(0)
-#define setTermDegree(term,index,value) (term.deg.ptr[index] = value)
-#define setTermSize(term,size) (term.sizu = size)
+#define termSize(term) ((term).sizu)
+#define termDegree(term,index) ((term).deg.ptr[index])
+#define termDegreeAllocator(term) ((term).deg.ptr = calloc(sizeof(N),(term).sizu))
+#define termFree(term) do{free((term).deg.ptr);}while(0)
+#define setTermDegree(term,index,value) ((term).deg.ptr[index] = value)
+#define setTermSize(term,size) ((term).sizu = size)
 #else
 #error Nope.
 #endif
@@ -255,7 +255,8 @@ Poly _polyMul(mut Poly v1,mut Poly v2);
 Poly polyDiv(unmut Poly dividend,unmut Poly divisor);
 Poly polySim(unmut Poly dividend,unmut Poly divisors);
 Poly polyS(unmut Poly f,unmut Poly g);
-void polyNice(unmut Poly p);
+void polyNice(mut Poly p);
+Poly _polyNice(mut Poly p);
 int polyCmp(unmut Poly v1,unmut Poly v2);
 
 Poly K2Poly(mut K k);
@@ -272,7 +273,6 @@ Poly term2Poly(mut Term);
 Poly polySort(unmut Poly poly);
 Poly _polySort(mut Poly poly);
 void polyPrint(unmut Poly poly,char*(*printer)(K ),FILE *fp);
-//Poly appendTerm2Poly(mut Poly poly,mut Term);
 double poly2Double(unmut Poly poly);
 Poly polyDup(unmut Poly poly);
 void polyFree(mut Poly v);

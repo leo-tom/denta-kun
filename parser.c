@@ -40,7 +40,7 @@ enum NodeType {
 	Block
 };
 
-#define NODE_STR_SIZE (128)
+#define NODE_STR_SIZE (32)
 typedef struct _Node{
 	enum NodeType type;
 	char str[NODE_STR_SIZE];

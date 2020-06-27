@@ -1,4 +1,4 @@
-#! /bin/sh -
+#! /bin/bash -
 #Copyright 2020, Leo Tomura
 #
 #This file is part of Dentakun.

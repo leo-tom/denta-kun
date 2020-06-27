@@ -196,8 +196,12 @@ Poly builtIn_SUB(Poly arg,BlackBoard blackboard){
 				size = sprintf(buff,"%ld",j);
 				Poly value = findFromBlackBoard(map,buff,size);
 				if(isNullPoly(value)){
-					fprintf(stderr,"I don't know what to do with x_{%ld}.\n",j);
-					goto err;
+					Term tmp;
+					setTermSize(tmp,j+1);
+					termDegreeAllocator(tmp);
+					setTermDegree(tmp,j,1);
+					copyK(tmp.coefficient,K_1);
+					value = term2Poly(tmp);
 				}
 				#if BOOLEAN
 				tmp = _polyMul(tmp,value);
@@ -419,7 +423,36 @@ Poly builtIn_RSHIFT(Poly arg,BlackBoard blackboard){
 		return arg;
 	}
 }
-
+Poly builtIn_CAR(Poly arg,BlackBoard blackboard){
+	if(polyType(arg) == ARRAY){
+		if(polySize(arg) == 0){
+			DIE;
+		}
+		Poly retval = polyDup(unwrapPolyArray(arg)[0]);
+		polyFree(arg);
+		return retval;
+	}
+	return arg;
+}
+Poly builtIn_CDR(Poly arg,BlackBoard blackboard){
+	if(polyType(arg) == ARRAY){
+		if(polySize(arg) == 1){
+			polyFree(arg);
+			return polyDup(nullPoly);
+		}
+		polyFree(unwrapPolyArray(arg)[0]);
+		if(polySize(arg) == 2){
+			return unwrapPolyArray(arg)[1];
+		}
+		return mkPolyArray(&unwrapPolyArray(arg)[1],polySize(arg) - 1);
+	}
+	polyFree(arg);
+	return polyDup(nullPoly);
+}
+Poly builtIn_PPSIZE(Poly arg,BlackBoard blackboard){
+	printf("%lu",polySize(arg));
+	return arg;
+}
 //ABCDEFGHIJKLMNOPQRSTUVWXYZ
 const Function BUILT_IN_FUNCS[] = {
 	{
@@ -431,6 +464,16 @@ const Function BUILT_IN_FUNCS[] = {
 		.name = "BCA",
 		.description = "Boolean Cellular Automaton",
 		.funcptr = builtIn_BCA
+	},
+	{
+		.name = "CAR",
+		.description = "Return first element of an array.",
+		.funcptr = builtIn_CAR
+	},
+	{
+		.name = "CDR",
+		.description = "Return given array without first element of it.",
+		.funcptr = builtIn_CDR
 	},
 	{
 		.name = "CLOCK",
@@ -486,6 +529,11 @@ const Function BUILT_IN_FUNCS[] = {
 		.name = "PPS",
 		.description = "Print given polynomials with scientific notation.",
 		.funcptr = builtIn_PPS
+	},
+	{
+		.name = "PPSIZE",
+		.description = "Print size of polynomials.",
+		.funcptr = builtIn_PPSIZE
 	},
 	{
 		.name = "RED",
