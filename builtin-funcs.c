@@ -346,6 +346,9 @@ Poly builtIn_LSHIFT(Poly arg,BlackBoard blackboard){
 		for(i = 0;i < polySize(arg);i++){
 			Term *term = &arg.ptr.terms[i];
 			if(term->sizu <= sizeof(N)*8){
+				if(term->sizu == 0){
+					continue;
+				}
 				term->deg.val >>= 1;
 			}else{
 				size_t j;
@@ -354,6 +357,11 @@ Poly builtIn_LSHIFT(Poly arg,BlackBoard blackboard){
 					term->deg.ptr[j - 1] |= (term->deg.ptr[j] & 1) << (sizeof(N) * 8 - 1);
 					term->deg.ptr[j] >>= 1;
 				}
+			}
+			term->sizu--;
+			if(term->sizu == sizeof(N)*8){
+				N tmp = term->deg.ptr[0];
+				term->deg.val = tmp;
 			}
 		}
 		return arg;
@@ -406,6 +414,37 @@ Poly builtIn_LSHIFT(Poly arg,BlackBoard blackboard){
 Poly builtIn_RSHIFT(Poly arg,BlackBoard blackboard){
 	if(polyType(arg) == POLY){
 		size_t i;
+		#if BOOLEAN
+		for(i = 0;i < polySize(arg);i++){
+			Term *term = &arg.ptr.terms[i];
+			if(term->sizu < sizeof(N)*8){
+				if(termSize(*term) == 0){
+					continue;
+				}
+				term->deg.val <<= 1;
+				term->sizu++;
+			}else if(term->sizu == sizeof(N)*8){
+				N tmp = term->deg.val;
+				size_t newSize = termSize(*term) + 1;
+				setTermSize(*term,newSize);
+				termDegreeAllocator(*term);
+				term->deg.ptr[1] = (tmp >> (sizeof(N)*8 -1)) & 0x1;
+				term->deg.ptr[0] = tmp << 1;
+			}else{
+				size_t j;
+				term->sizu++;
+				term->deg.ptr = realloc(term->deg.ptr,(termSize(*term)/(sizeof(N)*8) + 1) * (sizeof(N)*8));
+				N tmp = term->deg.ptr[0];
+				term->deg.ptr[0] <<= 1;
+				for(j = 1;j * (sizeof(N)*8) < termSize(*term);j++){
+					N temp = term->deg.ptr[j];
+					term->deg.ptr[j] = (term->deg.ptr[j] << 1) | (tmp >> (sizeof(N)*8 - 1));
+					tmp = temp;
+				}
+			}
+		}
+		return arg;
+		#else
 		for(i = 0;i < polySize(arg);i++){
 			Term term = arg.ptr.terms[i];
 			if(termSize(term) == 0){
@@ -428,6 +467,7 @@ Poly builtIn_RSHIFT(Poly arg,BlackBoard blackboard){
 			arg.ptr.terms[i] = newTerm;
 		}
 		return _polySort(arg);
+		#endif
 	}else{
 		Poly *array = unwrapPolyArray(arg);
 		size_t i;
@@ -539,7 +579,7 @@ const Function BUILT_IN_FUNCS[] = {
 	},
 	{
 		.name = "CMP",
-		.description = "Return 1 if 1st argument is inside ideal given by 2nd groebner basis",
+		.description = "Return 1 if 1st arg is inside ideal given by 2nd arg",
 		.funcptr = builtIn_CMP
 	},
 	{
