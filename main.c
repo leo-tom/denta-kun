@@ -152,8 +152,7 @@ int main(int argc,char *argv[]){
 			}
 		}
 	}
-	copyK(zeroPoly.ptr.terms[0].coefficient,K_0);
-	onePoly = K2Poly(K_1);
+	
 	BlackBoard blackboard = readPreInclude(mkBlackBoard());
 	if(LOADED_FUNCTION_PTR != NULL){
 		if(LOADED_FUNCTION_INPUT_SIZE == 0 || LOADED_FUNCTION_OUTPUT_SIZE == 0){

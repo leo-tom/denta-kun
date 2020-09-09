@@ -110,13 +110,13 @@ void divK(K val,const K v1,const K v2);
 #define addK(val,v1,v2) (val = (v1 & 0x1) ^ (v2 & 0x1))
 #define subK(val,v1,v2) (val = (v1 & 0x1) ^ (v2 & 0x1))
 #define mulK(val,v1,v2) (val = (v1 & v2) & 0x1)
-#define divK(val,v1,v2) (val = (v1 == 0) ? 0 : 1 )
+#define divK(val,v1,v2) (val = ((v1 == 0) ? 0 : 1) )
 #define str2K(val,str) ( atoi(str) ? (val = 1) : (val = 0) )
 #define K2double(k) ((double) k)
 #define cmpK(v1,v2) (v1 == v2 ? 0 : (v1 > v2 ? 1 : -1))
 #define freeK(k) (0)
 #define copyK(to,from) (to = from)
-#define initK(k) (k=0)
+#define initK(k) (k=1)
 
 #else
 #error Nope. 
@@ -169,7 +169,7 @@ void _setPolyType(Poly *poly,PolyType);
 
 #if BOOLEAN
 #define termSize(term) ((term).sizu)
-#define termFree(term) do{ if((term).sizu <= sizeof(N)*8){;}else{free((term).deg.ptr);}}while(0)
+#define termFree(term) do{ if((term).sizu <= sizeof(N)*8){(term).deg.val = 0;}else{free((term).deg.ptr);}}while(0)
 #define termDegree(term,index) (((term).sizu <= sizeof(N)*8) \
 									? (((term).deg.val >> (index)) & 0x1) \
 									: (N)(((term).deg.ptr[(index)/(sizeof(N)*8)] >> ((index) % (sizeof(N)*8))) & 0x1))
@@ -273,6 +273,7 @@ Poly term2Poly(mut Term);
 Poly polySort(unmut Poly poly);
 Poly _polySort(mut Poly poly);
 void polyPrint(unmut Poly poly,char*(*printer)(K ),FILE *fp);
+void polyPrintBori(unmut Poly poly,FILE *fp);
 double poly2Double(unmut Poly poly);
 Poly polyDup(unmut Poly poly);
 void polyFree(mut Poly v);

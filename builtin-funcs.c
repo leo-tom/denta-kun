@@ -64,6 +64,10 @@ Poly builtIn_PP(Poly arg,BlackBoard blackboard){
 	fprintf(OUTFILE,"\\\\\n");
 	return arg;
 }
+Poly builtIn_PPP(Poly arg,BlackBoard blackboard){
+	polyPrintBori(arg,OUTFILE);
+	return arg;
+}
 Poly builtIn_PPR(Poly arg,BlackBoard blackboard){
 	polyPrint(arg,K2str,OUTFILE);
 	return arg;
@@ -95,13 +99,13 @@ Poly builtIn_BBA(Poly array,BlackBoard blackboard){
 		#endif
 		if(isZeroPoly(r) || polyDegrees(r) == 0){
 			#if DEBUG >= 2
-			fprintf(stderr,"Grobner basis.\n ");
+			fprintf(stderr,"a Grobner basis.\n ");
 			#endif
 			polyFree(r);
 			break;
 		}
 		#if DEBUG >= 2
-		fprintf(stderr,"not Grobner basis because : \n");
+		fprintf(stderr,"not a Grobner basis because : \n");
 		polyPrint(r,K2str,stderr);
 		fprintf(stderr,"is not empty.\n");
 		#endif
@@ -182,7 +186,7 @@ Poly builtIn_SUB(Poly arg,BlackBoard blackboard){
 				index = j;
 			}
 		}
-		char buff[16];
+		char buff[32];
 		size = sprintf(buff,"%ld",index);
 		map = insert2BlackBoard(map,mkDefinition(buff,size,polyDup(right)));
 	}
@@ -337,6 +341,23 @@ Poly builtIn_EQ(Poly arg,BlackBoard blackboard){
 
 Poly builtIn_LSHIFT(Poly arg,BlackBoard blackboard){
 	if(polyType(arg) != ARRAY){
+		#if BOOLEAN
+		size_t i;
+		for(i = 0;i < polySize(arg);i++){
+			Term *term = &arg.ptr.terms[i];
+			if(term->sizu <= sizeof(N)*8){
+				term->deg.val >>= 1;
+			}else{
+				size_t j;
+				term->deg.ptr[0] >>= 1;
+				for(j = 1;j * (sizeof(N)*8) < termSize(*term);j++){
+					term->deg.ptr[j - 1] |= (term->deg.ptr[j] & 1) << (sizeof(N) * 8 - 1);
+					term->deg.ptr[j] >>= 1;
+				}
+			}
+		}
+		return arg;
+		#else
 		size_t i;
 		for(i = 0;i < polySize(arg);i++){
 			Term term = arg.ptr.terms[i];
@@ -364,6 +385,7 @@ Poly builtIn_LSHIFT(Poly arg,BlackBoard blackboard){
 			arg.ptr.terms[i] = newTerm;
 		}
 		return _polySort(arg);
+		#endif
 	}else{
 		Poly *array = unwrapPolyArray(arg);
 		size_t i;
@@ -450,8 +472,43 @@ Poly builtIn_CDR(Poly arg,BlackBoard blackboard){
 	return polyDup(nullPoly);
 }
 Poly builtIn_PPSIZE(Poly arg,BlackBoard blackboard){
+	if(isZeroPoly(arg)){
+		printf("0");
+		return arg;
+	}
 	printf("%lu",polySize(arg));
 	return arg;
+}
+Poly builtIn_CMP(Poly arg,BlackBoard blackboard){
+	if(polyType(arg) != ARRAY || polySize(arg) != 2){
+		fprintf(stderr,"You are using \\CMP wrong.\n");
+		DIE;
+	}
+	Poly *ptr;
+	Poly groebner_basis = unwrapPolyArray(arg)[1];
+	Poly retval;
+	size_t size;
+	if(polyType(arg) == ARRAY){
+		ptr = unwrapPolyArray(unwrapPolyArray(arg)[0]);
+		size = polySize(unwrapPolyArray(arg)[0]);
+	}else{
+		ptr = &unwrapPolyArray(arg)[0];
+		size = 1;
+	}
+	int i;
+	for(i = 0;i < size;i++){
+		Poly result = polySim(ptr[i],groebner_basis);
+		if(! isZeroPoly(result)){
+			polyFree(result);
+			retval = polyDup(zeroPoly);
+			goto ret;
+		}
+		polyFree(result);
+	}
+	ret:
+	polyFree(arg);
+	retval = polyDup(onePoly);
+	return retval;
 }
 //ABCDEFGHIJKLMNOPQRSTUVWXYZ
 const Function BUILT_IN_FUNCS[] = {
@@ -479,6 +536,11 @@ const Function BUILT_IN_FUNCS[] = {
 		.name = "CLOCK",
 		.description = "Call clock() function.",
 		.funcptr = builtIn_CLOCK
+	},
+	{
+		.name = "CMP",
+		.description = "Return 1 if 1st argument is inside ideal given by 2nd groebner basis",
+		.funcptr = builtIn_CMP
 	},
 	{
 		.name = "DIE",
@@ -519,6 +581,11 @@ const Function BUILT_IN_FUNCS[] = {
 		.name = "PP",
 		.description = "Print given polynomials.",
 		.funcptr = builtIn_PP
+	},
+	{
+		.name = "PPP",
+		.description = "Print given polynomials with PoriBori format.",
+		.funcptr = builtIn_PPP
 	},
 	{
 		.name = "PPR",

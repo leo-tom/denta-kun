@@ -41,6 +41,7 @@ void initConst(){
 	setTermSize(zeroPoly.ptr.terms[0],0);
 	termDegreeAllocator(zeroPoly.ptr.terms[0]);
 	copyK(zeroPoly.ptr.terms[0].coefficient,K_0);
+	onePoly = K2Poly(K_1);
 }
 #if RATIONAL
 void str2K(K val,const char *str){

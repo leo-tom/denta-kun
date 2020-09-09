@@ -474,6 +474,7 @@ Poly _parser(Node *head,Node *tail,BlackBoard *blackboard){
 		}
 		now = now->next;
 	}
+	
 	Poly retval = polyDup(onePoly);
 	
 	now = head;

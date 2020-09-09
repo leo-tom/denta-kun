@@ -76,7 +76,8 @@ void polyFree(mut Poly v){
 	}else{
 		Term *ptr = v.ptr.terms;
 		for(i=0;i < size;i++){
-			termFree(*ptr++);
+			termFree(*ptr);
+			ptr++;
 		}
 	}
 	if(size > 0){
@@ -211,21 +212,99 @@ void polyPrint(unmut Poly poly,char*(*printer)(K),FILE *fp){
 	}
 	fflush(fp);
 }
+void polyPrintBori(unmut Poly poly,FILE *fp){
+	size_t size = polySize(poly);
+	if(isZeroPoly(poly)){
+		fprintf(fp,"0");
+		return;
+	}else if(isNullPoly(poly)){
+		fprintf(fp,"null");
+		return;
+	}else if(polyType(poly) == ARRAY){
+		Poly *head = poly.ptr.polies;
+		fprintf(fp,"[");
+		while(size--){
+			polyPrintBori(*head,fp);
+			if(size != 0){
+				fprintf(fp,", ");
+			}
+			if(polyType(*head) == ARRAY){
+				fprintf(fp,"\n");
+			}
+			head++;
+		}
+		fprintf(fp,"]");
+		return;
+	}
+	size_t index = 0;
+	while(size-- > 0){
+		unmut Term term = poly.ptr.terms[index++];
+		if(!cmpK(term.coefficient,K_0)){
+			fprintf(stderr,"This should not be happening\n");
+			DIE;
+		}else if(termSize(term) > 0 && (!cmpK(term.coefficient,K_1) 
+				||!cmpK(term.coefficient,K_N1)
+					) ){
+			if(index != 1 && !cmpK(term.coefficient,K_1)){
+				fprintf(fp,"+ ");
+			}else if(!cmpK(term.coefficient,K_N1)){
+				if(index != 1) {
+					fprintf(fp,"+ ");
+				}
+			}else{
+				DIE;
+			}
+		}else{
+			if(index == 1){
+				if(!cmpK(term.coefficient,K_1)){
+					fprintf(fp," 1 ");
+				}else{
+					fprintf(fp," 0 ");
+				}
+			}else if(!cmpK(term.coefficient,K_1)){
+				fprintf(fp," + 1 ");
+			}
+		}
+		int64_t i;
+		for(i = 0; i < termSize(term);i++){
+			if(termDegree(term,i)){
+				int64_t index = i - SUBSHIFT;
+				if(index < 0){
+					fprintf(fp,"x%ld",1000 - index);
+				}else{
+					fprintf(fp,"x%ld",index);
+				}
+				break;
+			}
+		}
+		for(i = i+1; i < termSize(term);i++){
+			if(termDegree(term,i)){
+				int64_t index = i - SUBSHIFT;
+				if(index < 0){
+					fprintf(fp,"*x%ld ",1000 - index);
+				}else{
+					fprintf(fp,"*x%ld ",index);
+				}
+			}
+		}
+	}
+	fflush(fp);
+}
 Poly term2Poly(mut Term term){
 	Poly retval = {.size = 0};
 	retval.ptr.terms = malloc(sizeof(Term));
 	setPolySize(retval,1);
 	setPolyType(retval,POLY);
-	retval.ptr.terms[0].deg = term.deg;
-	retval.ptr.terms[0].sizu = term.sizu;
-	copyK(retval.ptr.terms[0].coefficient, term.coefficient);
+	retval.ptr.terms[0] = term;
 	return retval;
 }
 Term __polyIn(unmut Poly poly){
+	#if DEBUG
 	if(polySize(poly) <= 0){
 		fprintf(stderr,"This poly has no items\n");
 		DIE;
 	}
+	#endif
 	return poly.ptr.terms[0];
 }
 Term _polyIn(unmut Poly poly){
@@ -429,7 +508,7 @@ Poly _polyMul(mut Poly v1,mut Poly v2){
 			setPolySize(retval,index);
 			setPolyType(retval,POLY);
 			retval = _polyNice(retval);
-			//retval.ptr.terms = realloc(retval.ptr.terms,sizeof(Term)*retvalSize);
+			retval.ptr.terms = realloc(retval.ptr.terms,sizeof(Term)*retvalSize);
 			index = polySize(retval);
 		}
 	}
@@ -519,16 +598,32 @@ Poly polyDiv(unmut Poly dividend,unmut Poly divisors){
 				}
 			}
 			if(termSize(w) != k){
-				setTermSize(w,k);
-				Term newTerm = dupTerm(w);
-				termFree(w);
-				w = newTerm;
+				if(termSize(w) > sizeof(N)*8 && k <= sizeof(N)*8){
+					N tmp = w.deg.ptr[0];
+					free(w.deg.ptr);
+					w.deg.val = tmp;
+					setTermSize(w,k);
+				}else{
+					setTermSize(w,k);
+					Term newTerm = dupTerm(w);
+					termFree(w);
+					w = newTerm;
+				}
 			}
-			initK(w.coefficient);
-			divK(w.coefficient,u.coefficient , g.coefficient);
-			mulK(w.coefficient,w.coefficient , K_N1);
+			#if BOOLEAN
+				copyK(w.coefficient,K_1);
+			#else
+				initK(w.coefficient);
+				divK(w.coefficient,u.coefficient , g.coefficient);
+				mulK(w.coefficient,w.coefficient , K_N1);
+			#endif
 			Poly tmp = term2Poly(w);
 			h = _polyAdd(h,polyMul(tmp,divisor[j]));
+			#if DEBUG >= 2
+				fprintf(stderr,"h : ");
+				polyPrint(h,K2str,stderr);
+				fprintf(stderr,"\n");
+			#endif
 			retval[j] = _polyAdd(retval[j],tmp);
 		}
 	}
@@ -560,9 +655,11 @@ N __max(Term x,Term y,size_t index){
 }
 
 Poly polyS(unmut Poly f,unmut Poly g){
+	#if DEBUG
 	if(polyType(f) == ARRAY || polyType(g) == ARRAY){
 		DIE;
 	}
+	#endif
 	Term in_f = __polyIn(f);
 	Term in_g = __polyIn(g);
 	Term w_f,w_g;
@@ -579,7 +676,8 @@ Poly polyS(unmut Poly f,unmut Poly g){
 		setTermDegree(w_f,i,newDeg);
 	}
 	for(;i < termSize(w_f);i++){
-		setTermDegree(w_f,i,__max(in_f,in_g,i));
+		N newDeg = __max(in_f,in_g,i);
+		setTermDegree(w_f,i,newDeg);
 	}
 	for(;i > 0;i--){
 		if(termDegree(w_f,(i-1))){
@@ -587,17 +685,25 @@ Poly polyS(unmut Poly f,unmut Poly g){
 		}
 	}
 	if(termSize(w_f) != i){
-		setTermSize(w_f,i);
-		Term tmp = dupTerm(w_f);
-		termFree(w_f);
-		w_f = tmp;
+		if(termSize(w_f) > sizeof(N)*8 && i <= sizeof(N)*8){
+			N tmp = w_f.deg.ptr[0];
+			free(w_f.deg.ptr);
+			w_f.deg.val = tmp;
+			setTermSize(w_f,i);
+		}else{
+			setTermSize(w_f,i);
+			Term tmp = dupTerm(w_f);
+			termFree(w_f);
+			w_f = tmp;
+		}
 	}
 	for(i = 0;i < termSize(in_g);i++){
 		N newDeg = __max(in_f,in_g,i) - termDegree(in_g,i);
 		setTermDegree(w_g,i,newDeg);
 	}
 	for(;i < termSize(w_g);i++){
-		setTermDegree(w_g,i,__max(in_f,in_g,i));
+		N newDeg = __max(in_f,in_g,i);
+		setTermDegree(w_g,i,newDeg);
 	}
 	for(;i > 0;i--){
 		if(termDegree(w_g,(i-1))){
@@ -605,20 +711,37 @@ Poly polyS(unmut Poly f,unmut Poly g){
 		}
 	}
 	if(termSize(w_g) != i){
-		setTermSize(w_g,i);
-		Term tmp = dupTerm(w_g);
-		termFree(w_g);
-		w_g = tmp;
+		if(termSize(w_g) > sizeof(N)*8 && i <= sizeof(N)*8){
+			N tmp = w_g.deg.ptr[0];
+			free(w_g.deg.ptr);
+			w_g.deg.val = tmp;
+			setTermSize(w_g,i);
+		}else{
+			setTermSize(w_g,i);
+			Term tmp = dupTerm(w_g);
+			termFree(w_g);
+			w_g = tmp;
+		}
 	}
 	divK(w_f.coefficient,K_1,in_f.coefficient);
 	divK(w_g.coefficient,K_1,in_g.coefficient);
 	Poly w_f_p = term2Poly(w_f);
 	Poly w_g_p = term2Poly(w_g);
-	setPolyType(w_f_p,POLY);
-	setPolyType(w_g_p,POLY);
+
 	Poly tmp_f = polyMul(w_f_p,f); polyFree(w_f_p);
 	Poly tmp_g = polyMul(w_g_p,g); polyFree(w_g_p);
 	Poly retval = polySub(tmp_f,tmp_g); polyFree(tmp_f);polyFree(tmp_g);
+	#if DEBUG >= 2
+		fprintf(stderr,"f : ");
+		polyPrint(f,K2str,stderr);
+		fprintf(stderr,"\n");
+		fprintf(stderr,"g : ");
+		polyPrint(g,K2str,stderr);
+		fprintf(stderr,"\n");
+		fprintf(stderr,"S : ");
+		polyPrint(retval,K2str,stderr);
+		fprintf(stderr,"\n");
+	#endif
 	return retval;
 }
 
@@ -757,7 +880,7 @@ Poly _polyNice(mut Poly p){
 		if(counter % 2 == 0){
 			termFree(p.ptr.terms[i]);
 			for(j = i + 1;j < polySize(p);j++){
-				if(cmpTerm(p.ptr.terms[j],zeroTerm)){
+				if(p.ptr.terms[j].coefficient != K_0){
 					p.ptr.terms[i] = p.ptr.terms[j];
 					p.ptr.terms[j] = zeroTerm;
 					i--;
@@ -767,6 +890,7 @@ Poly _polyNice(mut Poly p){
 			if(j == polySize(p)){
 				// all remaining terms are zero.
 				setPolySize(p,i);
+				p.ptr.terms = realloc(p.ptr.terms,sizeof(Term)*i);
 				return p;
 			}
 		}
@@ -776,12 +900,11 @@ Poly _polyNice(mut Poly p){
 		return polyDup(zeroPoly);
 	}
 	setPolySize(p,size);
-	//p.ptr.terms = realloc(p.ptr.terms,sizeof(Term)*size);
+	p.ptr.terms = realloc(p.ptr.terms,sizeof(Term)*size);
 	return p;
 }
 
 void polyNice(mut Poly p){
-	
 	#if BOOLEAN
 	return;
 	#else
