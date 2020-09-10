@@ -864,7 +864,7 @@ Poly _polyNice(mut Poly p){
 	size = 0;
 	for(i = 0;i < polySize(p);i++){
 		Term term = p.ptr.terms[i];
-		if(!cmpTerm(term,zeroTerm)){
+		if(!cmpK(term.coefficient,K_0)){
 			continue;
 		}else{
 			size = i + 1;
@@ -880,7 +880,7 @@ Poly _polyNice(mut Poly p){
 		if(counter % 2 == 0){
 			termFree(p.ptr.terms[i]);
 			for(j = i + 1;j < polySize(p);j++){
-				if(p.ptr.terms[j].coefficient != K_0){
+				if(!cmpK(p.ptr.terms[j].coefficient, K_0)){
 					p.ptr.terms[i] = p.ptr.terms[j];
 					p.ptr.terms[j] = zeroTerm;
 					i--;

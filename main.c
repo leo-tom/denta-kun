@@ -172,8 +172,10 @@ int main(int argc,char *argv[]){
 		#else 
 			poly = parser(infile,&blackboard);
 			cmdNumber++;
+			#if DEBUG >= 2
 			polyPrint(poly,K2str,stderr);
 			fprintf(stderr," => %lu\n",polySizeInByte(poly));
+			#endif
 		#endif
 		polyFree(poly);
 	}

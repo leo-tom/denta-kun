@@ -40,7 +40,7 @@ enum NodeType {
 	Block
 };
 
-#define NODE_STR_SIZE (32)
+#define NODE_STR_SIZE (24)
 typedef struct _Node{
 	enum NodeType type;
 	char str[NODE_STR_SIZE];
@@ -347,6 +347,83 @@ Poly executeSpecialFunction(Node *head,Node **next,BlackBoard *blackboard){
 		polyFree(bunbo);
 		polyFree(bunsi);
 		return retval;
+	}else if(!strcmp(name,"FBL")){
+		if(head->next == NULL ){
+			fprintf(stderr,"FBL function takes an argument.\n");
+			DIE;
+		}
+		Node *now = unwrapBlock(head->next);
+		size_t capacity = 8;
+		size_t i = 0;
+		Term *ptr = malloc(sizeof(Term)*capacity);
+		ptr[i].sizu = 0;
+		ptr[i].deg.val = 0;
+		copyK(ptr[i].coefficient,K_0);
+		while(now){
+			if(!strcmp(now->str,"x")){
+				now = now->next;
+				int64_t index = SUBSHIFT;
+				if(now != NULL && !strcmp(now->str,"_")){
+					now = now->next;
+					int64_t n = 1;
+					Node *node;
+					switch(now->type){
+						case Block:{
+							node = unwrapBlock(now);
+						}
+						break;
+						default : {
+							node = now;
+						}
+						break;
+					}
+					if(node->type == Command && !strcmp(node->str,"+")){
+						node = node->next;
+						if(node->type == Number && !strcmp(node->str,"-1")){
+							n = -1;
+							node = node->next;
+						}else{
+							n = 1;
+						}
+					}
+					if(node->type == Number){
+						n *= atoll(node->str);
+					}else{
+						fprintf(stderr,"Subscript must be a number.\n");
+						DIE;
+					}
+					index += n;
+				}
+				if(index >= sizeof(N)*8 || index < 0){
+					fprintf(stderr,"FBL accept variable whose subscript is in [0:64] only.\n");
+					DIE;
+				}
+				if(index >= termSize(ptr[i])){
+					setTermSize(ptr[i],(index+1));
+				}
+				setTermDegree(ptr[i],index,1);
+				copyK(ptr[i].coefficient,K_1);
+			}else if(!strcmp(now->str,"+")){
+				i++;
+				if(i >= capacity){
+					capacity *= 2;
+					ptr = realloc(ptr,sizeof(Term)*capacity);
+				}
+				ptr[i].sizu = 0;
+				ptr[i].deg.val = 0;
+				copyK(ptr[i].coefficient,K_0);
+			}else if(now->type == Number){
+				str2K(ptr[i].coefficient,now->str);
+			}
+			now = now->next;
+		}
+		i++;
+		Poly retval = {
+			.size = i
+		};
+		retval.ptr.terms = realloc(ptr,sizeof(Term)*i);
+		*next = head->next->next;
+		return _polySort(retval);
 	}
 	DIE;
 }
@@ -357,6 +434,7 @@ int isSpecialFunction(const char * const name){
 	|| !strcmp(name,"WHILE")
 	|| !strcmp(name,"frac")
 	|| !strcmp(name,"FRAC")
+	|| !strcmp(name,"FBL")
 		){
 		return 1;
 	}
