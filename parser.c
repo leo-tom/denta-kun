@@ -40,17 +40,16 @@ enum NodeType {
 	Block
 };
 
-#define NODE_STR_SIZE (24)
 typedef struct _Node{
 	enum NodeType type;
-	char str[NODE_STR_SIZE];
+	char *str;
 	struct _Node *next;
 }Node;
 
 #define append(head,butt,nodeType,data) do{ \
 	Node *newNodeDesu = malloc(sizeof(Node)); \
 	newNodeDesu->type = nodeType; \
-	memcpy(newNodeDesu->str,data,NODE_STR_SIZE); \
+	newNodeDesu->str = strdup(data); \
 	newNodeDesu->next = NULL; \
 	if(butt == NULL){ \
 		head = butt = newNodeDesu; \
@@ -60,6 +59,10 @@ typedef struct _Node{
 	} \
 }while(0)
 
+//return next node
+Node * freeNode(Node *node);
+void freeNodes(Node *node);
+
 Poly _parser(Node *head,Node *tail,BlackBoard *blackboard);
 
 Node * __parser(FILE *stream){
@@ -67,11 +70,8 @@ Node * __parser(FILE *stream){
 	
 	Node *head,*butt;
 	head = butt = NULL;
-	
-	const enum NodeType command = Command;
-	const enum NodeType variable = Variable;
-	const enum NodeType number = Number;
-	
+	char _buff[128];
+	size_t counter = sizeof(_buff) - 1;
 	
 	while((c = getNextChar(stream))!= EOF){
 		switch(c){
@@ -115,16 +115,16 @@ Node * __parser(FILE *stream){
 			case '_':
 			case ',':
 			{
-				char buff[NODE_STR_SIZE];
+				char buff[2];
 				buff[0] = c; buff[1] = 0;
-				append(head,butt,command,buff);
+				append(head,butt,Command,buff);
 				break;
 			}
 			case '-':
 			{
-				char buff[NODE_STR_SIZE] = {0};
+				char buff[3];
 				buff[0] = '+'; buff[1] = 0;
-				append(head,butt,command,buff);
+				append(head,butt,Command,buff);
 				strcpy(buff,"-1");
 				append(head,butt,Number,buff);
 				break;
@@ -135,14 +135,19 @@ Node * __parser(FILE *stream){
 					return head;
 				}
 				ungetc(c,stream);
-				char _buff[NODE_STR_SIZE] = {0};
 				char *buff = _buff;
+				counter = sizeof(_buff) - 1;
 				while(isalpha(c = fgetc(stream)) ){
 					*buff++ = c;
+					counter--;
+					if(counter == 0){
+						fprintf(stderr,"Too long function name.\n");
+						DIE;
+					}
 				}
 				*buff = 0;
 				ungetc(c,stream);
-				append(head,butt,command,_buff);
+				append(head,butt,Command,_buff);
 				break;
 			}
 			case '{':
@@ -151,8 +156,7 @@ Node * __parser(FILE *stream){
 				Node *new = malloc(sizeof(Node));
 				new->type = Block;
 				new->next = NULL;
-				void *insideBlock = __parser(stream);
-				memcpy(new->str,&insideBlock,sizeof(void *));
+				new->str = (void *)__parser(stream);
 				if(butt == NULL){
 					head = butt = new;
 				}else{
@@ -169,25 +173,35 @@ Node * __parser(FILE *stream){
 			default :
 			{
 				if(isdigit(c) || c == '-'){
-					char _buff[NODE_STR_SIZE] = {0};
 					char *buff = _buff;
+					counter = sizeof(_buff) - 2;
 					*buff++ = c;
 					while(isdigit(c = fgetc(stream)) || c == '.' || c == 'E' || c == 'e' ){
 						*buff++ = c;
+						counter--;
+						if(counter == 0){
+							fprintf(stderr,"Too long function name.\n");
+							DIE;
+						}
 					}
 					ungetc(c,stream);
 					*buff = 0;
-					append(head,butt,number,_buff);
+					append(head,butt,Number,_buff);
 				}else if(isalpha(c)){
-					char _buff[NODE_STR_SIZE] = {0};
 					char *buff = _buff;
+					counter = sizeof(_buff) - 2;
 					*buff++ = c;
 					while(isalpha(c = fgetc(stream)) || isdigit(c)){
 						*buff++ = c;
+						counter--;
+						if(counter == 0){
+							fprintf(stderr,"Too long function name.\n");
+							DIE;
+						}
 					}
 					ungetc(c,stream);
 					*buff = 0;
-					append(head,butt,variable,_buff);
+					append(head,butt,Variable,_buff);
 				}else{
 					fprintf(stderr,"Unknown char\'%c\'[%x]\n",c,c);
 					DIE;
@@ -240,9 +254,7 @@ void _print_parsed_tex(Node *n,FILE *fp){
 #endif
 
 Node * unwrapBlock(Node *node){
-	Node *ptr;
-	memcpy(&ptr,node->str,sizeof(Node *));
-	return ptr;
+	return (void *)node->str;
 }
 
 Node * variableName(Node *node,char *str){
@@ -358,13 +370,13 @@ Poly executeSpecialFunction(Node *head,Node **next,BlackBoard *blackboard){
 		Term *ptr = malloc(sizeof(Term)*capacity);
 		ptr[i].sizu = 0;
 		ptr[i].deg.val = 0;
-		copyK(ptr[i].coefficient,K_0);
+		copyK(ptr[i].coefficient,K_1);
 		while(now){
 			if(!strcmp(now->str,"x")){
-				now = now->next;
+				now = freeNode(now);
 				int64_t index = SUBSHIFT;
 				if(now != NULL && !strcmp(now->str,"_")){
-					now = now->next;
+					now = freeNode(now);
 					int64_t n = 1;
 					Node *node;
 					switch(now->type){
@@ -395,14 +407,13 @@ Poly executeSpecialFunction(Node *head,Node **next,BlackBoard *blackboard){
 					index += n;
 				}
 				if(index >= sizeof(N)*8 || index < 0){
-					fprintf(stderr,"FBL accept variable whose subscript is in [0:64] only.\n");
+					fprintf(stderr,"FBL accept variable whose subscript is 0 to 64 only.\n");
 					DIE;
 				}
 				if(index >= termSize(ptr[i])){
 					setTermSize(ptr[i],(index+1));
 				}
 				setTermDegree(ptr[i],index,1);
-				copyK(ptr[i].coefficient,K_1);
 			}else if(!strcmp(now->str,"+")){
 				i++;
 				if(i >= capacity){
@@ -411,17 +422,18 @@ Poly executeSpecialFunction(Node *head,Node **next,BlackBoard *blackboard){
 				}
 				ptr[i].sizu = 0;
 				ptr[i].deg.val = 0;
-				copyK(ptr[i].coefficient,K_0);
+				copyK(ptr[i].coefficient,K_1);
 			}else if(now->type == Number){
 				str2K(ptr[i].coefficient,now->str);
 			}
-			now = now->next;
+			now = freeNode(now);
 		}
 		i++;
 		Poly retval = {
 			.size = i
 		};
 		retval.ptr.terms = realloc(ptr,sizeof(Term)*i);
+		head->next->str = NULL;
 		*next = head->next->next;
 		return _polySort(retval);
 	}
@@ -702,14 +714,23 @@ Poly _parser(Node *head,Node *tail,BlackBoard *blackboard){
 	return retval;
 }
 
+Node * freeNode(Node *node){
+	if(node == NULL){
+		return NULL;
+	}
+	Node *next = node->next;
+	if(node->type == Block){
+		freeNodes(unwrapBlock(node));
+	}else{
+		free(node->str);
+	}
+	free(node);
+	return next;
+}
+
 void freeNodes(Node *node){
 	while(node){
-		Node *next = node->next;
-		if(node->type == Block){
-			freeNodes(unwrapBlock(node));
-		}
-		free(node);
-		node = next;
+		node = freeNode(node);
 	}
 }
 
