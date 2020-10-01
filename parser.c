@@ -132,12 +132,12 @@ Node * __parser(FILE *stream){
 			case '\\':
 			{
 				if((c = getNextChar(stream)) == '\\'){
-					return head;
+					goto ret;
 				}
 				ungetc(c,stream);
 				char *buff = _buff;
 				counter = sizeof(_buff) - 1;
-				while(isalpha(c = fgetc(stream)) ){
+				while(isalpha(c = fgetc(stream)) || isdigit(c)){
 					*buff++ = c;
 					counter--;
 					if(counter == 0){
@@ -168,7 +168,7 @@ Node * __parser(FILE *stream){
 			case '}':
 			case ')':
 				{
-					return head;
+					goto ret;
 				}
 			default :
 			{
@@ -210,8 +210,13 @@ Node * __parser(FILE *stream){
 			}	
 		}
 	}
+	ret:
 	return head;
 }
+Node * unwrapBlock(Node *node){
+	return (void *)node->str;
+}
+
 #if DEBUG >= 1
 void _print_parsed_tex(Node *n,FILE *fp){
 	if(n == NULL){
@@ -240,8 +245,7 @@ void _print_parsed_tex(Node *n,FILE *fp){
 				}
 			}break;
 			case Block : {
-				Node *ptr;
-				memcpy(&ptr,now->str,8);
+				Node *ptr = unwrapBlock(now);
 				fprintf(fp,"{");
 				_print_parsed_tex(ptr,fp);
 				fprintf(fp,"}");
@@ -252,10 +256,6 @@ void _print_parsed_tex(Node *n,FILE *fp){
 	}
 }
 #endif
-
-Node * unwrapBlock(Node *node){
-	return (void *)node->str;
-}
 
 Node * variableName(Node *node,char *str){
 	enum NodeType lastType = Number;
@@ -424,7 +424,9 @@ Poly executeSpecialFunction(Node *head,Node **next,BlackBoard *blackboard){
 				ptr[i].deg.val = 0;
 				copyK(ptr[i].coefficient,K_1);
 			}else if(now->type == Number){
-				str2K(ptr[i].coefficient,now->str);
+				K muldis;
+				str2K(muldis,now->str);
+				mulK(ptr[i].coefficient,ptr[i].coefficient,muldis);
 			}
 			now = freeNode(now);
 		}

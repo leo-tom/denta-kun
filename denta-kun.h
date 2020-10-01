@@ -42,7 +42,7 @@ along with Dentakun.  If not, see <http://www.gnu.org/licenses/>.
 #endif
 
 #ifdef BUILTIN_POPCOUNT_EXISTS
-#define popcount(v) (sizeof(v) > 4 ? __builtin_popcountll(v) : __builtin_popcount(v))
+#define popcount(v) ( __builtin_popcountll(v) )
 #endif
 
 #ifndef BUILTIN_POPCOUNT_EXISTS

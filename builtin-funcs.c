@@ -77,6 +77,33 @@ Poly builtIn_PPS(Poly arg,BlackBoard blackboard){
 	fprintf(OUTFILE,"\n");
 	return arg;
 }
+Poly builtIn_PDI(Poly arg,BlackBoard blackboard){
+	if(polyType(arg) == ARRAY){
+		fprintf(stderr,"PDI takes polynomial only");
+		DIE;
+	}
+	Term *terms = arg.ptr.terms;
+	size_t *degs = calloc(65 , sizeof(size_t));
+	size_t size = polySize(arg);
+	if(isZeroPoly(arg)){
+		size = 0;
+	}
+	while(size--){
+		if(termSize(*terms) > sizeof(N)*8){
+			DIE;
+		}
+		int deg = popcount(terms->deg.val);
+		degs[deg]++;
+		terms++;
+	}
+	int i;
+	printf("%ld",degs[0]);
+	for(i = 1;i < 65;i++){
+		printf(",%ld",degs[i]);
+	}
+	free(degs);
+	return arg;
+}
 Poly builtIn_SP(Poly arg,BlackBoard blackboard){
 	if(polyType(arg) != ARRAY && polySize(arg) != 2){
 		fprintf(stderr,"S polynomial can be computed only with 2 polynomials\n");
@@ -519,6 +546,41 @@ Poly builtIn_PPSIZE(Poly arg,BlackBoard blackboard){
 	printf("%lu",polySize(arg));
 	return arg;
 }
+
+Poly removeBy(Poly p,int deg){
+	if(polyType(p) == ARRAY){
+		DIE;
+	}
+	Term *terms = malloc(sizeof(Term)*polySize(p));
+	Term *from = p.ptr.terms;
+	int i;
+	int index = 0;
+	for(i = 0;i < polySize(p);i++){
+		if(popcount(from[i].deg.val) <= deg){
+			terms[index++] = dupTerm(from[i]);
+		}
+	}
+	if(index == 0){
+		polyFree(p);
+		return polyDup(zeroPoly);
+	}
+	Poly retval = {
+		.size = index
+	};
+	terms = realloc(terms,sizeof(Term)*index);
+	retval.ptr.terms = terms;
+	polyFree(p);
+	return retval;
+}
+Poly builtIn_RMBYDEG1(Poly arg,BlackBoard blackboard){
+	return removeBy(arg,1);
+}
+Poly builtIn_RMBYDEG2(Poly arg,BlackBoard blackboard){
+	return removeBy(arg,2);
+}
+Poly builtIn_RMBYDEG3(Poly arg,BlackBoard blackboard){
+	return removeBy(arg,3);
+}
 Poly builtIn_CMP(Poly arg,BlackBoard blackboard){
 	if(polyType(arg) != ARRAY || polySize(arg) != 2){
 		fprintf(stderr,"You are using \\CMP wrong.\n");
@@ -618,6 +680,11 @@ const Function BUILT_IN_FUNCS[] = {
 		.funcptr = builtIn_PBB
 	},
 	{
+		.name = "PDI",
+		.description = "Print degree info",
+		.funcptr = builtIn_PDI
+	},
+	{
 		.name = "PP",
 		.description = "Print given polynomials.",
 		.funcptr = builtIn_PP
@@ -646,6 +713,21 @@ const Function BUILT_IN_FUNCS[] = {
 		.name = "RED",
 		.description = "Reduce polynomial",
 		.funcptr = builtIn_RED
+	},
+	{
+		.name = "RMDEG1",
+		.description = "Remove all terms whose degree is more than 1",
+		.funcptr = builtIn_RMBYDEG1
+	},
+	{
+		.name = "RMDEG2",
+		.description = "Remove all terms whose degree is more than 2",
+		.funcptr = builtIn_RMBYDEG2
+	},
+	{
+		.name = "RMDEG3",
+		.description = "Remove all terms whose degree is more than 3",
+		.funcptr = builtIn_RMBYDEG3
 	},
 	{
 		.name = "RSHIFT",
