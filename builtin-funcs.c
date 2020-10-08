@@ -330,6 +330,7 @@ Poly builtIn_RZP(Poly arg,BlackBoard blackboard){
 	return arg;
 }
 Poly builtIn_EQ(Poly arg,BlackBoard blackboard){
+	Poly retval;
 	if(polyType(arg) != ARRAY || polySize(arg) <= 1){
 		fprintf(stderr,"EQ function expects two parameters\n");
 		DIE;
@@ -339,31 +340,35 @@ Poly builtIn_EQ(Poly arg,BlackBoard blackboard){
 		for(i = 0;i + 1 < polySize(arg);i++){
 			if(polyType(array[i]) != ARRAY && polyType(array[i + 1]) != ARRAY){
 				if(polyCmp(array[i],array[i+1])){
-					polyFree(arg);
-					return polyDup(zeroPoly);
+					retval = polyDup(zeroPoly);
+					goto ret;
 				}
 			}else if(polyType(array[i]) == ARRAY && polyType(array[i + 1]) == ARRAY){
 				if(polySize(array[i]) != polySize(array[i + 1])){
-					return polyDup(zeroPoly);
+					retval = polyDup(zeroPoly);
+					goto ret;
 				}
 				size_t j;
 				for(j = 0;j < polySize(array[i]);j++){
 					Poly *ptr = malloc(sizeof(Poly) * 2);
 					ptr[0] = polyDup(unwrapPolyArray(array[i])[j]);
 					ptr[1] = polyDup(unwrapPolyArray(array[i + 1])[j]);
-					Poly retval = builtIn_EQ(mkPolyArray(ptr,2),blackboard);
+					retval = builtIn_EQ(mkPolyArray(ptr,2),blackboard);
 					if(isZeroPoly(retval)){
-						polyFree(arg);
-						return retval;
+						goto ret;
 					}
 					polyFree(retval);
 				}
 			}else {
-				return polyDup(zeroPoly);
+				retval = polyDup(zeroPoly);
+				goto ret;
 			}
 		}
 	}
-	return K2Poly(K_1);
+	retval = K2Poly(K_1);
+	ret :
+	polyFree(arg);
+	return retval;
 }
 
 Poly builtIn_LSHIFT(Poly arg,BlackBoard blackboard){

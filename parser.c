@@ -42,14 +42,14 @@ enum NodeType {
 
 typedef struct _Node{
 	enum NodeType type;
-	char *str;
+	char str[24];
 	struct _Node *next;
 }Node;
 
 #define append(head,butt,nodeType,data) do{ \
 	Node *newNodeDesu = malloc(sizeof(Node)); \
 	newNodeDesu->type = nodeType; \
-	newNodeDesu->str = strdup(data); \
+	strcpy(newNodeDesu->str,data); \
 	newNodeDesu->next = NULL; \
 	if(butt == NULL){ \
 		head = butt = newNodeDesu; \
@@ -70,7 +70,7 @@ Node * __parser(FILE *stream){
 	
 	Node *head,*butt;
 	head = butt = NULL;
-	char _buff[128];
+	char _buff[24];
 	size_t counter = sizeof(_buff) - 1;
 	
 	while((c = getNextChar(stream))!= EOF){
@@ -109,9 +109,12 @@ Node * __parser(FILE *stream){
 				}
 				break;
 			}
+			case '^':
+			{
+				DIE;
+			}		
 			case '=':
 			case '+':
-			case '^':
 			case '_':
 			case ',':
 			{
@@ -156,7 +159,8 @@ Node * __parser(FILE *stream){
 				Node *new = malloc(sizeof(Node));
 				new->type = Block;
 				new->next = NULL;
-				new->str = (void *)__parser(stream);
+				void *p = (void *)__parser(stream);
+				memcpy(new->str,&p,sizeof(void *));
 				if(butt == NULL){
 					head = butt = new;
 				}else{
@@ -201,6 +205,44 @@ Node * __parser(FILE *stream){
 					}
 					ungetc(c,stream);
 					*buff = 0;
+					if(!strcmp(_buff,"x")){
+						c = getNextChar(stream);
+						if(c != '_'){
+							ungetc(c,stream);
+						}else{
+							//DO SPECIAL BEHAVIOR
+							//name this variable "$number"
+							//where number is subscript of x
+							if((c = getNextChar(stream)) == '{'){
+								buff = _buff;
+								counter = sizeof(_buff) - 3;
+								*buff++ = '$';
+								c = getNextChar(stream);
+								if( (!isdigit(c)) && c != '-'){
+									DIE;
+								}
+								*buff++ = c;
+								while(isdigit(c = getNextChar(stream))){
+									*buff++ = c;
+									counter--;
+									if(counter == 0){
+										DIE;
+									}
+								}
+								if(c != '}'){
+									DIE;
+								}
+								*buff = 0;
+							}else if(isdigit(c)){
+								_buff[0] = '$';
+								_buff[1] = c;
+								_buff[2] = 0;
+							}else{
+								fprintf(stderr,"\"x_\" must not be followed by %c.",c);
+								DIE;
+							}
+						}
+					}
 					append(head,butt,Variable,_buff);
 				}else{
 					fprintf(stderr,"Unknown char\'%c\'[%x]\n",c,c);
@@ -214,7 +256,9 @@ Node * __parser(FILE *stream){
 	return head;
 }
 Node * unwrapBlock(Node *node){
-	return (void *)node->str;
+	void *retval;
+	memcpy(&retval,node->str,sizeof(void *));
+	return retval;
 }
 
 #if DEBUG >= 1
@@ -372,43 +416,20 @@ Poly executeSpecialFunction(Node *head,Node **next,BlackBoard *blackboard){
 		ptr[i].deg.val = 0;
 		copyK(ptr[i].coefficient,K_1);
 		while(now){
-			if(!strcmp(now->str,"x")){
-				now = freeNode(now);
-				int64_t index = SUBSHIFT;
-				if(now != NULL && !strcmp(now->str,"_")){
-					now = freeNode(now);
-					int64_t n = 1;
-					Node *node;
-					switch(now->type){
-						case Block:{
-							node = unwrapBlock(now);
-						}
-						break;
-						default : {
-							node = now;
-						}
-						break;
+			if(now->str[0] == '$'){
+				int64_t index = SUBSHIFT + atoi(&(now->str[1]));
+				if(index >= sizeof(N)*8){
+					if(termSize(ptr[i]) <= sizeof(N)*8){
+						N tmp = ptr[i].deg.val;
+						N *p = calloc(sizeof(N),(index + 1)/(sizeof(N)*8) + 1);
+						p[0] = tmp;
+						ptr[i].deg.ptr = p;
+					}else if((termSize(ptr[i])/(sizeof(N)*8) ) <= ((index+1)/(sizeof(N)*8)) ){
+						N *p = calloc(sizeof(N),(index + 1)/(sizeof(N)*8) + 1);
+						memcpy(p,ptr[i].deg.ptr,sizeof(N)*(termSize(ptr[i])/(sizeof(N)*8) + 1) );
+						free(ptr[i].deg.ptr);
+						ptr[i].deg.ptr = p;
 					}
-					if(node->type == Command && !strcmp(node->str,"+")){
-						node = node->next;
-						if(node->type == Number && !strcmp(node->str,"-1")){
-							n = -1;
-							node = node->next;
-						}else{
-							n = 1;
-						}
-					}
-					if(node->type == Number){
-						n *= atoll(node->str);
-					}else{
-						fprintf(stderr,"Subscript must be a number.\n");
-						DIE;
-					}
-					index += n;
-				}
-				if(index >= sizeof(N)*8 || index < 0){
-					fprintf(stderr,"FBL accept variable whose subscript is 0 to 64 only.\n");
-					DIE;
 				}
 				if(index >= termSize(ptr[i])){
 					setTermSize(ptr[i],(index+1));
@@ -435,7 +456,7 @@ Poly executeSpecialFunction(Node *head,Node **next,BlackBoard *blackboard){
 			.size = i
 		};
 		retval.ptr.terms = realloc(ptr,sizeof(Term)*i);
-		head->next->str = NULL;
+		memset(head->next->str,0,sizeof(void *));
 		*next = head->next->next;
 		return _polySort(retval);
 	}
@@ -626,72 +647,19 @@ Poly _parser(Node *head,Node *tail,BlackBoard *blackboard){
 				break;
 			}
 			case Variable:{
-				if(!strcmp(now->str,"x")){
-					now = now->next;
-					int counter = 0;
-					int64_t index = SUBSHIFT;
-					int64_t degrees = 1;
-					for(counter = 0;counter < 2;counter++){
-						if(now == NULL){
-							break;
-						}else if(!strcmp(now->str,"_") || !strcmp(now->str,"^")){
-							int subscriptDesuka;
-							if(!strcmp(now->str,"_")){
-								subscriptDesuka = 1;
-							}else{
-								subscriptDesuka = 0;
-							}
-							now = now->next;
-							int64_t n = 1;
-							Node *node;
-							switch(now->type){
-								case Block:{
-									node = unwrapBlock(now);
-								}
-								break;
-								default : {
-									node = now;
-								}
-								break;
-							}
-							if(node->type == Command && !strcmp(node->str,"+")){
-								node = node->next;
-								if(node->type == Number && !strcmp(node->str,"-1")){
-									n = -1;
-									node = node->next;
-								}else{
-									n = 1;
-								}
-							}
-							if(node->type == Number){
-								n *= atoll(node->str);
-							}else{
-								fprintf(stderr,"Subscript must be a number.\n");
-								DIE;
-							}
-							if(subscriptDesuka){
-								index += n;
-							}else{
-								degrees = n;
-							}
-							now = now->next;
-						}else{
-							break;
-						}
-					}
+				if(now->str[0] == '$'){
+					int64_t index = atoi(&(now->str[1])) + SUBSHIFT;
 					Term term;
 					setTermSize(term,(index + 1));
 					termDegreeAllocator(term);
-					#if BOOLEAN
-					if(degrees > 1){
-						degrees = 1;
-					}
-					#endif
-					setTermDegree(term,index,degrees);
+					setTermDegree(term,index,1);
 					copyK(term.coefficient,K_1);
 					Poly mulDis = term2Poly(term);
 					retval = _polyMul(retval,mulDis);
-					//polyPrint(tmp,K2str,stderr);
+					now = now->next;
+				}else if(!strcmp(now->str,"x")){
+					fprintf(stderr,"WTF\n");
+					DIE;
 				}else{
 					char buff[256];
 					now = variableName(now,buff);
@@ -723,8 +691,6 @@ Node * freeNode(Node *node){
 	Node *next = node->next;
 	if(node->type == Block){
 		freeNodes(unwrapBlock(node));
-	}else{
-		free(node->str);
 	}
 	free(node);
 	return next;
